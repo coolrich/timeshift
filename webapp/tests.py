@@ -13,7 +13,7 @@ class HomepageTests(SimpleTestCase):
 
     def test_template_name_correct(self):
         response = self.client.get(reverse("home"))
-        self.assertTemplateUsed(response, "home.html")
+        self.assertTemplateUsed(response, "index.html")
 
     def test_template_content(self):
         response = self.client.get(reverse("home"))

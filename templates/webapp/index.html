@@ -1,0 +1,68 @@
+{% extends "webapp/base.html" %}
+
+{% block content %}
+<section class="hero">
+    <h1>⏳ {{ site_name }}</h1>
+    <p>
+        Інструмент віртуального часу для розробників, тестувальників і автоматизації. Симулюйте часові сценарії, пришвидшуйте або зупиняйте час, створюйте незалежні годинники для кожного середовища.
+    </p>
+</section>
+
+<section class="features mt-5">
+    <h2 class="text-center mb-5">Ключові сфери застосування</h2>
+    <div class="row g-4">
+        <div class="col-md-4">
+            <div class="feature-card priority-feature">
+                <i class="fas fa-robot fa-2x mb-3"></i>
+                <h5>Автоматизовані тести</h5>
+                <p>Симуляція часу у cron-логіці, планувальниках і job-queue</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="feature-card priority-feature">
+                <i class="fas fa-calendar-check fa-2x mb-3"></i>
+                <h5>Системи планування</h5>
+                <p>Відтворення повторюваних івентів, часових зсувів і дедлайнів</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="feature-card priority-feature">
+                <i class="fas fa-truck-fast fa-2x mb-3"></i>
+                <h5>Логістика та ETA</h5>
+                <p>Прогнозування затримок, часових вікон та маршрутів</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="features mt-5">
+    <h3 class="text-center mb-4">Інші варіанти використання</h3>
+    <div class="row g-4">
+        <div class="col-md-3"><div class="feature-card"><i class="fas fa-coins fa-lg mb-2"></i><h5>FinTech</h5><p>Симуляція періодичних виплат і нарахувань</p></div></div>
+        <div class="col-md-3"><div class="feature-card"><i class="fas fa-gamepad fa-lg mb-2"></i><h5>GameDev</h5><p>Таймери, івенти, cooldown-и для NPC</p></div></div>
+        <div class="col-md-3"><div class="feature-card"><i class="fas fa-shield-halved fa-lg mb-2"></i><h5>Аудит</h5><p>Ретроспективний аналіз логів за симульованим часом</p></div></div>
+        <div class="col-md-3"><div class="feature-card"><i class="fas fa-graduation-cap fa-lg mb-2"></i><h5>Освіта</h5><p>Тренажери, тестування курсів і дедлайнів</p></div></div>
+    </div>
+</section>
+
+<section class="use-cases mt-5">
+    <div class="row">
+        <div class="col-md-6">
+            <h4><i class="fas fa-star me-2"></i>Переваги</h4>
+            <ul class="mt-3">
+                <li><i class="fas fa-check-circle text-success me-2"></i>Мульти-годинники з окремим плином часу</li>
+                <li><i class="fas fa-check-circle text-success me-2"></i>Проста інтеграція у backend або CI</li>
+                <li><i class="fas fa-check-circle text-success me-2"></i>Підтримка шаблонів і сценаріїв</li>
+            </ul>
+        </div>
+        <div class="col-md-6">
+            <h4><i class="fas fa-cog me-2"></i>Технічні можливості</h4>
+            <ul class="mt-3">
+                <li><i class="fas fa-check-circle text-success me-2"></i>REST API з авторизацією</li>
+                <li><i class="fas fa-check-circle text-success me-2"></i>Підтримка пауз, прискорень, стрибків</li>
+                <li><i class="fas fa-check-circle text-success me-2"></i>Точність до мілісекунд</li>
+            </ul>
+        </div>
+    </div>
+</section>
+{% endblock %}

@@ -8,8 +8,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-class HomePageView(TemplateView):
-    template_name = "home.html"
+class IndexView(TemplateView):
+    template_name = "webapp/index.html"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
