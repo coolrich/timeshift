@@ -1,32 +1,32 @@
-{% extends "webapp/base.html" %}
+{% extends "base.html" %}
 {% block content %}
-<section class="py-5 bg-black text-light text-center">
+<section class="py-5 text-light text-center" style="background: linear-gradient(to bottom, #2c5364, black);">
     <div class="container">
         <h1 class="display-4 fw-bold">⏳ {{ ENV_SITE_NAME }}</h1>
-        <p class="lead mb-4">Інструмент віртуального часу для розробників і тестувальників. Симулюйте часові сценарії, прискорюйте або зупиняйте час.</p>
+        <p class="lead mb-4">Інструмент віртуального часу для розробників і тестувальників. Симулюйте часові сценарії, створюючи віртуальні годинники, прискорюйте або зупиняйте час.</p>
         <a href="#features" class="btn btn-primary btn-lg">Почати зараз</a>
     </div>
 </section>
 
-<section id="features" class="py-5 bg-dark text-light">
+<section id="features" style="background: linear-gradient(to bottom, black, #2c5364);" class="py-5 text-light" >
     <div class="container">
         <h2 class="text-center mb-5">Ключові можливості</h2>
         <div class="row g-4">
-            <div class="col-md-4"><div class="card p-4 text-center h-100 text-light bg-black"><h5>Автотести</h5><p>Симуляція cron, job-queue та CI/CD часових сценаріїв</p></div></div>
-            <div class="col-md-4"><div class="card p-4 text-center h-100 text-light bg-black"><h5>Планування</h5><p>Відтворення дедлайнів та повторюваних івентів</p></div></div>
-            <div class="col-md-4"><div class="card p-4 text-center h-100 text-light bg-black"><h5>Логістика ETA</h5><p>Прогнозування затримок, маршрутів та вікон</p></div></div>
+            <div class="col-md-4"><div class="card p-4 text-center h-100 text-light bg-black bg-gradient"><h5>Автотести</h5><p>Симуляція cron, job-queue та CI/CD часових сценаріїв</p></div></div>
+            <div class="col-md-4"><div class="card p-4 text-center h-100 text-light bg-black bg-gradient"><h5>Планування</h5><p>Відтворення дедлайнів та повторюваних івентів</p></div></div>
+            <div class="col-md-4"><div class="card p-4 text-center h-100 text-light bg-black bg-gradient"><h5>Логістика ETA</h5><p>Прогнозування затримок, маршрутів та вікон</p></div></div>
         </div>
     </div>
 </section>
 
-<section id="usecases" class="py-5 bg-secondary text-light">
+<section id="usecases" style="background: linear-gradient(to bottom, #2c5364, black);" class="py-5 bg-secondary text-light">
     <div class="container">
         <h3 class="text-center mb-4">Сфери застосування</h3>
         <div class="row g-4">
-            <div class="col-md-3"><div class="card p-3 text-center h-100"><h6>FinTech</h6><p>Періодичні виплати/нарахування</p></div></div>
-            <div class="col-md-3"><div class="card p-3 text-center h-100"><h6>GameDev</h6><p>Івенти та таймери NPC</p></div></div>
-            <div class="col-md-3"><div class="card p-3 text-center h-100"><h6>Аудит</h6><p>Ретроспективний аналіз логів</p></div></div>
-            <div class="col-md-3"><div class="card p-3 text-center h-100"><h6>Освіта</h6><p>Тренажери, курси, дедлайни</p></div></div>
+            <div class="col-md-3"><div class="card p-3 text-center text-light h-100 bg-black bg-gradient"><h6>FinTech</h6><p>Періодичні виплати/нарахування</p></div></div>
+            <div class="col-md-3"><div class="card p-3 text-center text-light h-100 bg-black bg-gradient"><h6>GameDev</h6><p>Івенти та таймери NPC</p></div></div>
+            <div class="col-md-3"><div class="card p-3 text-center text-light h-100 bg-black bg-gradient"><h6>Аудит</h6><p>Ретроспективний аналіз логів</p></div></div>
+            <div class="col-md-3"><div class="card p-3 text-center text-light h-100 bg-black bg-gradient"><h6>Освіта</h6><p>Тренажери, курси, дедлайни</p></div></div>
         </div>
     </div>
 </section>

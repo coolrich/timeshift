@@ -55,3 +55,9 @@ body {
     background: rgba(0, 180, 216, 0.05);
     border-color: rgba(0, 180, 216, 0.3);
 }
+
+.my-bg-gradient {
+    --bs-gradient-from: var(black);
+    --bs-gradient-to: var(gray);
+    background: linear-gradient(to top, var(--bs-gradient-from), var(--bs-gradient-to) !important;
+}
