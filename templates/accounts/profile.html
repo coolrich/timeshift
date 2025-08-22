@@ -9,9 +9,9 @@
     <div class="card">
         <div class="card-body">
             <h5 class="card-title">API Токен</h5>
-            {% if user.simulation_state %}
+            {% if user.virtual_clock %}
                 <p class="card-text">
-                    <code>{{ user.simulation_state.api_token }}</code>
+                    <code>{{ user.virtual_clock.api_token }}</code>
                 </p>
             {% else %}
                 <p class="text-muted">Токен ще не згенеровано.</p>

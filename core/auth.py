@@ -1,17 +1,44 @@
+from django.contrib.auth.models import AnonymousUser
 from ninja.security import HttpBearer
 from django.contrib.auth import get_user_model
+from ninja.security.base import AuthBase
 
-from core.models import UserSimulationState
+from core.models import VirtualClock
+import logging
+
+logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
-class AuthBearer(HttpBearer):
-    def authenticate(self, request, token: str) -> User | None:
-        try:
-            if request.user.is_authenticated:
-                return request.user
-            else:
-                state = UserSimulationState.objects.get(api_token=token)
-            return state.user
-        except UserSimulationState.DoesNotExist:
-            return None
+
+class SessionOrToken(AuthBase):
+    openapi_type = "http"         # ← ОБОВʼЯЗКОВО
+    openapi_scheme = "bearer"     # ← каже OpenAPI що це Bearer Auth
+
+    def __call__(self, request):
+        return self.authenticate(request)
+
+    def authenticate(self, request):
+        # 1) Якщо юзер є в сесії (через django.contrib.auth)
+        logger.info(f"Attempting to authenticate user from session: {getattr(request, 'user', None)}")
+        if getattr(request, "user", None) and request.user.is_authenticated:
+            logger.info(f"Authenticated user from session: {request.user}")
+            logger.info(f"Action: {request.method} {request.path}")
+            return request.user
+
+        # 2) Bearer токен
+        logger.info(f"Attempting to authenticate user from token: {request.headers.get('Authorization', None)}")
+        auth = request.headers.get("Authorization", "")
+        if auth.lower().startswith("bearer "):
+            token = auth[7:].strip()
+            try:
+                # user = VirtualClock.objects.select_related("user").get(api_token=token).user
+                user = VirtualClock.objects.get(api_token=token).user
+                logger.info(f"Authenticated user from token: {user}")
+                logger.info(f"Action: {request.method} {request.path}")
+                return user
+            except VirtualClock.DoesNotExist:
+                return None
+
+        return None
+

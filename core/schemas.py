@@ -6,15 +6,15 @@ class TimeRequest(Schema):
 
 class TimeResponse(Schema):
     time: str
-    is_real: bool
     tick_enabled: bool
 
 class StatusResponse(Schema):
     status: str
-    current_time: str | None = None
     tick_enabled: bool | None = None
-    error: str | None = None
 
+class SetRealResponse(Schema):
+    status: str
+    current_time: datetime
 
-class ToggleTickRequest(Schema):
+class TickSetRequest(Schema):
     enabled: bool

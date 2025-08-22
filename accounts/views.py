@@ -17,5 +17,5 @@ class SignUpView(CreateView):
         return response
 
 class ProfileView(LoginRequiredMixin, TemplateView):
-    login_url = reverse_lazy("login")
     template_name = "accounts/profile.html"
+    login_url = reverse_lazy("login")

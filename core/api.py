@@ -1,42 +1,41 @@
 from ninja import Router
-from django.utils.timezone import now
 from django.contrib.auth import get_user_model
 from ninja.errors import HttpError
 
-from .schemas import TimeRequest, TimeResponse, StatusResponse, ToggleTickRequest
-from .services import TimeShiftController, TimeService
-from core.models import UserSimulationState
-from core.auth import AuthBearer
+from .schemas import TimeRequest, TimeResponse, StatusResponse, TickSetRequest, SetRealResponse
+from .services import TimeShiftController
+from .utils import TimeService
+from core.models import VirtualClock
+from logging import getLogger
 
-router = Router(auth=AuthBearer())
-# router = Router()
+logger = getLogger(__name__)
 
+router = Router()
 User = get_user_model()
 
 
 def get_simulator(request) -> TimeShiftController:
     """Повертає TimeShiftController для аутентифікованого користувача."""
-    user: User = request.user
-    if not user.is_authenticated:
-        raise HttpError(401, "Unauthenticated")
-    state, _ = UserSimulationState.objects.get_or_create(user=user)
+    user: User = request.auth
+    logger.info(f"get_simulator: user {user} is authenticated")
+    state, _ = VirtualClock.objects.get_or_create(user=user)
     return TimeShiftController(state)
 
 
-@router.get("/test/")
-def tests(request):
+@router.get("/test")
+def test(request):
     return f"Hello, {request.user}!"
 
-@router.get("/time/", response=TimeResponse)
+
+@router.get("/time", response=TimeResponse)
 def get_time(request):
     simulator = get_simulator(request)
     return {
-        "time": simulator.now().isoformat(),
-        "is_real": simulator.is_real(),
-        "tick_enabled": simulator.tick_enabled,
+        "time": simulator.get_time(),
+        "tick_enabled": simulator.tick_status,
     }
 
-@router.post("/time/", response={200: StatusResponse})
+@router.post("/time", response=StatusResponse)
 def set_time(request, payload: TimeRequest):
     simulator = get_simulator(request)
     is_valid, new_time = TimeService.validate_time_format(payload.time)
@@ -44,21 +43,28 @@ def set_time(request, payload: TimeRequest):
         raise HttpError(400, "Invalid time format")
 
     simulator.set_time(new_time)
-    simulator.user.save()
-    return {"status": "success", "current_time": simulator.now().isoformat()}
+    simulator.commit()  # явне збереження
+    return {"status": "success", "current_time": simulator.get_time()}
 
 
-@router.post("/tick/", response=StatusResponse)
-def toggle_tick(request, payload: ToggleTickRequest):
+@router.get("/time/toggle", response=StatusResponse)
+def toggle_tick(request):
+    simulator = get_simulator(request)
+    simulator.toggle_tick()
+    simulator.commit()
+    return {"status": "success", "tick_enabled": simulator.tick_status}
+
+@router.post("/time/tick", response=StatusResponse)
+def set_tick(request, payload: TickSetRequest):
     simulator = get_simulator(request)
     simulator.toggle_tick(payload.enabled)
-    simulator.user.save()
-    return {"status": "success", "tick_enabled": simulator.tick_enabled}
+    simulator.commit()
+    return {"status": "success", "tick_enabled": simulator.tick_status}
 
 
-@router.post("/setreal/", response=StatusResponse)
+@router.post("/time/setreal", response=SetRealResponse)
 def set_real(request):
     simulator = get_simulator(request)
-    simulator.set_real_time()
-    simulator.user.save()
-    return {"status": "success", "current_time": now().isoformat()}
+    simulator.set_real()
+    simulator.commit()  # явне збереження
+    return {"status": "success", "current_time": simulator.get_time()}

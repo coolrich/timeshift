@@ -1,9 +1,9 @@
 from django.urls import path
 from ninja import NinjaAPI
 from core.api import router
+from core.auth import SessionOrToken
 
-
-api = NinjaAPI(version="1.0")
+api = NinjaAPI(auth=SessionOrToken())
 api.add_router("/", router)
 
 urlpatterns = [
