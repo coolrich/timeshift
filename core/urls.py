@@ -4,7 +4,7 @@ from core.api import router
 from core.auth import SessionOrToken
 
 api = NinjaAPI(auth=SessionOrToken())
-api.add_router("/", router)
+api.add_router("/time", router)
 
 urlpatterns = [
     path("v1/", api.urls, name="api"),

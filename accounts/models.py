@@ -1,8 +1,11 @@
+import uuid
+
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
 
 class TimeShiftUser(AbstractUser):
+    # user_api_token = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     full_name = models.CharField(max_length=255, blank=True)
 
     def __str__(self):

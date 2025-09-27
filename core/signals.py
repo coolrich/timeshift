@@ -2,10 +2,19 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.contrib.auth import get_user_model
 from .models import VirtualClock
+from django.db.models.signals import m2m_changed
+from django.core.exceptions import ValidationError
 
 User = get_user_model()
 
-@receiver(post_save, sender=User)
-def create_user_virtual_clock(sender, instance, created, **kwargs):
-    if created:
-        VirtualClock.objects.create(user=instance)
+# @receiver(post_save, sender=User)
+# def create_user_virtual_clock(sender, instance, created, **kwargs):
+#     if created:
+#         new_public_id = VirtualClock.objects.all().order_by("-public_id").first().public_id + 1
+#         VirtualClock.objects.create(user_owner=instance, public_id=new_public_id)
+
+@receiver(m2m_changed, sender=VirtualClock.allowed_users.through)
+def prevent_owner_in_allowed(sender, instance, action, pk_set, **kwargs):
+    if action == "pre_add":
+        if instance.user_owner_id in pk_set:
+            raise ValidationError("Owner cannot be added to allowed_users.")
