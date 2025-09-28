@@ -30,6 +30,8 @@ class VirtualClockController:
         """Повертає поточний час і стан тіку, без save()"""
         return self._current_time().isoformat()
 
+    def get_user_owner(self):
+        return self.virtual_clock.user_owner
 
     def set_real_time(self):
         """Встановлює реальний час і зупиняє тік, зміни у пам'яті"""
@@ -66,7 +68,7 @@ class VirtualClockController:
         self.virtual_clock.name = new_name
         return self.virtual_clock
 
-    def commit(self):
+    def save(self):
         """Явний запис змін у базу"""
         self.virtual_clock.save()
         return self.virtual_clock
@@ -76,7 +78,7 @@ class VirtualClockController:
     def list_clocks(user: User) -> QuerySet[VirtualClock]:
         """Returns list of clocks of specified user"""
         # return VirtualClock.objects.all(user)
-        return VirtualClock.objects.filter(user_owner=user)
+        return VirtualClock.objects.filter(user_owner=user) | user.shared_clocks.all()#VirtualClock.objects.filter(allowed_users__in=[user])
         # return self.virtual_clock.objects.all()
 
     @staticmethod
@@ -95,17 +97,17 @@ class VirtualClockController:
           - "remove_users" → список id для видалення
         """
         # Повне оновлення
-        if "allowed_users" in payload:
+        if "allowed_users" in payload and payload["allowed_users"]:
             users = TimeShiftUser.objects.filter(id__in=payload["allowed_users"])
             self.virtual_clock.allowed_users.set(users)
 
         # Додавання
-        if "add_users" in payload:
+        if "add_users" in payload and payload["add_users"]:
             users = TimeShiftUser.objects.filter(id__in=payload["add_users"])
             self.virtual_clock.allowed_users.add(*users)
 
         # Видалення
-        if "remove_users" in payload:
+        if "remove_users" in payload and payload["remove_users"]:
             users = TimeShiftUser.objects.filter(id__in=payload["remove_users"])
             self.virtual_clock.allowed_users.remove(*users)
 

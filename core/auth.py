@@ -1,11 +1,14 @@
-from typing import Any
+from typing import Any, List
 
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import AnonymousUser
+from django.db.models import QuerySet
+from django.http import Http404
 from ninja.security import HttpBearer
 from django.contrib.auth import get_user_model
 from ninja.security.base import AuthBase
 
+from accounts.models import TimeShiftUser
 from core.models import VirtualClock
 import logging
 
@@ -36,13 +39,13 @@ class SessionOrToken(AuthBase):
         if auth.lower().startswith("bearer "):
             token = auth[7:].strip()
             try:
-                # user = VirtualClock.objects.select_related("user").get(api_token=token).user
-                user_owner: User = VirtualClock.objects.get(api_token=token).user_owner
-                logger.info(f"Authenticated user from token: {token}")
+                user_owner: User = TimeShiftUser.objects.get(api_token=token)
+                logger.info(f"Authenticated user {user_owner.username} from token: {token}")
                 logger.info(f"Action: {request.method} {request.path}")
                 return user_owner
-            except VirtualClock.DoesNotExist:
-                return None
+            except User.DoesNotExist:
+                logger.info(f"User not found for token: {token}")
+                raise Http404(f"User not found for token: {token}")
 
         return None
 

@@ -18,14 +18,15 @@ class TickSetRequest(Schema):
 
 # Базова схема з усіма полями
 class BaseClockSchema(Schema):
-    id: int
-    name: str
+    clock_id: int
+    name: str | None
     time: str
     allowed_users: List[int]
     tick_enabled: bool
 
 # Схема для відповіді (всі поля обов'язкові)
 class TimeData(BaseClockSchema):
+    user_owner_id: int
     pass
 
 class TimeDataUpdate(Schema):
@@ -87,4 +88,8 @@ class DeleteClockResponse(Schema):
 
 class ErrorClockResponse(Schema):
     status: str
-    detail: str
+    detail: str | None = None
+
+class UserDataResponse(Schema):
+    id: int
+    username: str
