@@ -21,7 +21,7 @@ class BaseClockSchema(Schema):
     clock_id: int
     name: str | None
     time: str
-    allowed_users: List[int]
+    allowed_users: Optional[List[int]] = None
     tick_enabled: bool
 
 # Схема для відповіді (всі поля обов'язкові)
@@ -64,7 +64,7 @@ class SetRealResponse(Schema):
 
 class VirtualClockInfo(Schema):
     id: str  # UUID
-    name: Optional[str]
+    name: Optional[str] = None
     tick_enabled: bool
     current_time: str  # ISO 8601
 
@@ -74,7 +74,7 @@ class VirtualClockInfo(Schema):
 #     clocks: List[VirtualClockInfo]
 
 class CreateClockRequest(Schema):
-    name: Optional[str]
+    name: Optional[str] = None
     # Authorization: str
 
 # class ClockUpdateRequest(Schema):

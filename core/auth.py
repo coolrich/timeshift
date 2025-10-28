@@ -8,7 +8,6 @@ from ninja.security import HttpBearer
 from django.contrib.auth import get_user_model
 from ninja.security.base import AuthBase
 
-from accounts.models import TimeShiftUser
 from core.models import VirtualClock
 import logging
 
@@ -39,13 +38,13 @@ class SessionOrToken(AuthBase):
         if auth.lower().startswith("bearer "):
             token = auth[7:].strip()
             try:
-                user_owner: User = TimeShiftUser.objects.get(api_token=token)
-                logger.info(f"Authenticated user {user_owner.username} from token: {token}")
-                logger.info(f"Action: {request.method} {request.path}")
-                return user_owner
+                user: User = User.objects.get(api_token=token)
             except User.DoesNotExist:
                 logger.info(f"User not found for token: {token}")
                 raise Http404(f"User not found for token: {token}")
+            logger.info(f"Authenticated user {user.username} from token: {token}")
+            logger.info(f"Action: {request.method} {request.path}")
+            return user
 
         return None
 

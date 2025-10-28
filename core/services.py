@@ -78,7 +78,7 @@ class VirtualClockController:
     def list_clocks(user: User) -> QuerySet[VirtualClock]:
         """Returns list of clocks of specified user"""
         # return VirtualClock.objects.all(user)
-        return VirtualClock.objects.filter(user_owner=user) | user.shared_clocks.all()#VirtualClock.objects.filter(allowed_users__in=[user])
+        return VirtualClock.objects.filter(user_owner=user) | user.shared_clocks.all()
         # return self.virtual_clock.objects.all()
 
     @staticmethod

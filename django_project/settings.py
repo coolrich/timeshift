@@ -40,8 +40,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'webapp.apps.PagesConfig',
-    "accounts",
-    "core",
+    'accounts',
+    'core',
 ]
 
 MIDDLEWARE = [

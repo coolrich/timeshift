@@ -8,11 +8,17 @@
     
     <div class="card">
         <div class="card-body">
-            <h5 class="card-title">API Токен</h5>
-            {% if user.virtual_clocks %}
+            <h5 class="card-title">API Токен Користувача</h5>
                 <p class="card-text">
-                    <code>{{ user.virtual_clocks.api_token }}</code>
+                    <code>{{ user.api_token }}</code>
                 </p>
+            {% if user.virtual_clocks %}
+                <h5 class="card-title">API Токени віртуальних годинників</h5>
+                {% for clock in user.virtual_clocks.all %}
+                    <p class="card-text">
+                        <code>{{ clock.api_token }}</code>
+                    </p>
+                {% endfor %}
             {% else %}
                 <p class="text-muted">Токен ще не згенеровано.</p>
             {% endif %}

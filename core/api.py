@@ -1,23 +1,26 @@
-from django.contrib.auth import get_user_model
+from logging import getLogger
 from typing import Optional, List
 
+from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.http import Http404
+from django.http import Http404, HttpResponse
+from ninja import NinjaAPI
 from ninja import Router
-
-from accounts.models import TimeShiftUser
-from .utils import TimeService
-from .schemas import TimeRequest, TickSetRequest, TimeData, TickStatusResponse, \
-    TimeResponse, VirtualClockInfo, DeleteClockResponse, ClockUpdateRequest, \
-    CreateClockRequest, TimeDataUpdate, ErrorClockResponse, BaseClockSchema, UserDataResponse
-from core.models import VirtualClock
-from .services import VirtualClockController
 from ninja.errors import HttpError
-from logging import getLogger
+from ninja.responses import Response
+
+from core.auth import SessionOrToken
+from core.models import VirtualClock
+from .schemas import TimeData, VirtualClockInfo, ClockUpdateRequest, \
+    CreateClockRequest, TimeDataUpdate, ErrorClockResponse, UserDataResponse
+from .services import VirtualClockController
+from .utils import TimeService
 
 logger = getLogger(__name__)
-router = Router()
 User = get_user_model()
+api = NinjaAPI(auth=SessionOrToken())
+router = Router()
+api.add_router("/time", router)
 
 # TODO: review the method
 def get_v_clock_controller(request, clock_id: Optional[str] = None) -> tuple[VirtualClockController, User]:
@@ -26,12 +29,13 @@ def get_v_clock_controller(request, clock_id: Optional[str] = None) -> tuple[Vir
         try:
             clock = user.virtual_clocks.get(private_id=clock_id)
         except (VirtualClock.DoesNotExist, ValueError):
-            logger.error(f"Clock not found for private_id: {clock_id}")
+            logger.error(f"Clock not found for user {user} private_id: {clock_id}")
             try:
-                clock = VirtualClock.objects.get(id=clock_id)
+                logger.info(f"Looking for shared clock with private_id: {clock_id}")
+                clock = VirtualClock.objects.get(private_id=clock_id)
             except (VirtualClock.DoesNotExist, ValueError, ValidationError):
                 logger.error(f"Clock not found for id: {clock_id}")
-                raise Http404(f"clock not found for id: {clock_id}")
+                raise Http404()
 
         if not (user == clock.user_owner or user in clock.allowed_users.all()):
             raise PermissionDenied("You do not have access to this clock")
@@ -48,7 +52,7 @@ def get_v_clock_controller(request, clock_id: Optional[str] = None) -> tuple[Vir
     return VirtualClockController(clock), user
 
 
-@router.get("/test", response=UserDataResponse)
+@router.get("/testuser", response=UserDataResponse)
 def test(request):
     user = request.auth
     return UserDataResponse(
@@ -113,8 +117,10 @@ def test(request):
 #         "message": "Tick status updated successfully"
 #     }
 
+
+
 # TODO: review this method
-@router.post("/setreal/", response=TimeData)
+@router.post("/setreal/", response={200:TimeData, 403:ErrorClockResponse})
 def set_real(request, clock_id: Optional[str] = None):
     controller, user = get_v_clock_controller(request, clock_id)
     controller.set_real_time()
@@ -135,27 +141,29 @@ def set_real(request, clock_id: Optional[str] = None):
 # CRUD ops
 # ================
 
-@router.post("/clocks/", response=VirtualClockInfo)
-def create_clock(request, payload: CreateClockRequest):
+@router.post("/clocks/", response={201:VirtualClockInfo, 403:ErrorClockResponse})
+def create_clock(request, payload: Optional[CreateClockRequest] = None):
+    logger.debug(f"create_clock() request: {request}")
     user = request.auth
+    logger.debug(f"create_clock() user: {user} | name: {payload.name if payload else None}")
     clock = VirtualClock.objects.create(
         user_owner=user,
-        name=payload.name or f"Clock {VirtualClock.objects.filter(user=user).count() + 1}"
+        name=payload.name if payload else None
+        # f"Clock {VirtualClock.objects.filter(user_owner=user).count() + 1}"
     )
-    return VirtualClockInfo(
+    return Response(data=VirtualClockInfo(
         id=str(clock.id),
         name=clock.name,
         tick_enabled=clock.tick_enabled,
         current_time=clock.current_time.isoformat()
-    )
+    ),
+        status=201)
 
 # 🟢 RETRIEVE (отримати один годинник)
 @router.get("/clocks/{clock_id}/", response={200:TimeData, 403:ErrorClockResponse})
 def retrieve_clock(request, clock_id: str):
-    try:
-        controller, user = get_v_clock_controller(request, clock_id)
-    except PermissionDenied as e:
-        return 403, ErrorClockResponse(status="error", detail=str(e))
+    controller, user = get_v_clock_controller(request, clock_id)
+
     return TimeData(
         clock_id=controller.virtual_clock.private_id,
         user_owner_id=controller.get_user_owner().id,
@@ -166,20 +174,39 @@ def retrieve_clock(request, clock_id: str):
     )
 
 # 🟢 LIST (отримати всі годинники)
-@router.get("/clocks/", response=List[TimeData])
+@router.get("/clocks/", response={200:List[TimeData], 403:ErrorClockResponse})
 def list_clocks(request):
     user = request.auth
-    return [
-        TimeData(
-            clock_id=c.virtual_clock.private_id,
-            user_owner_id=c.get_user_owner().id,
-            name=c.virtual_clock.name,
-            time=c.get_time(),
-            allowed_users=list(c.virtual_clock.allowed_users.values_list("id", flat=True)),
-            tick_enabled=c.tick_status
-        )
-        for c in (VirtualClockController(c) for c in VirtualClockController.list_clocks(user))
-    ]
+    clocks = []
+
+    for controller in (VirtualClockController(c) for c in VirtualClockController.list_clocks(user)):
+        clock = controller.virtual_clock
+        owner = controller.get_user_owner()
+
+        # показуємо allowed_users лише власнику
+
+        if owner == user:
+            allowed_users = list(clock.allowed_users.values_list("id", flat=True))
+
+            clocks.append(TimeData(
+                clock_id=clock.private_id,
+                user_owner_id=owner.id,
+                name=clock.name,
+                time=controller.get_time(),
+                allowed_users=allowed_users,
+                tick_enabled=controller.tick_status,
+            ))
+        else:
+            clocks.append(TimeData(
+                clock_id=clock.private_id,
+                user_owner_id=owner.id,
+                name=clock.name,
+                time=controller.get_time(),
+                tick_enabled=controller.tick_status,
+            ))
+
+    return clocks
+
 
 @router.put("/clocks/", response={200:TimeDataUpdate, 403:ErrorClockResponse})
 def update_clock(request, payload: ClockUpdateRequest):
@@ -236,9 +263,11 @@ def update_clock(request, payload: ClockUpdateRequest):
 
 
 
-@router.delete("/clocks/{clock_id}", response=DeleteClockResponse)
+@router.delete(
+    "/clocks/{clock_id}",
+    response={204: None, 404: ErrorClockResponse, 403: ErrorClockResponse},
+)
 def delete_clock(request, clock_id: str):
-    logger.info(f"delete_clock: {clock_id}")
     controller, user = get_v_clock_controller(request, clock_id)
     controller.virtual_clock.delete()
-    return DeleteClockResponse(status="success", message="Clock deleted successfully")
+    return HttpResponse(status=204)

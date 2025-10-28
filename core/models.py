@@ -11,7 +11,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 class VirtualClock(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, unique=True)
     private_id = models.PositiveIntegerField(unique=True, editable=False, default=1)
 
     user_owner = models.ForeignKey(
@@ -39,15 +39,15 @@ class VirtualClock(models.Model):
                 token = secrets.token_urlsafe(32)
                 if not VirtualClock.objects.filter(api_token=token).exists():
                     self.api_token = token
-                    logger.info(f"core.models.VirtualClock.save(): api_token: {self.api_token}")
+                    logger.info(f"core.models.VirtualClock.save(): new api_token created: {self.api_token}")
                     break
 
         last = VirtualClock.objects.all().order_by("-private_id").first()
-        logger.info(f"core.models.VirtualClock.save(): last private_id: {last.private_id}")
+        # logger.info(f"core.models.VirtualClock.save(): last private_id: {last.private_id}")
+        if not last:
+            logger.info(f"core.models.VirtualClock.save(): self.private_id is not set")
+        self.private_id = 1 if not last else int(last.private_id) + 1
         logger.info(f"core.models.VirtualClock.save(): self.private_id: {self.private_id}")
-        if not self.private_id or self.private_id <= last.private_id:
-            # last = VirtualClock.objects.all().order_by("-public_id").first()
-            self.private_id = 1 if not last else int(last.private_id) + 1
         super().save(*args, **kwargs)
 
     class Meta:
