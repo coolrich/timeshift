@@ -72,7 +72,7 @@ class ClockTests(TestCase):
         VirtualClock.objects.create(user_owner=user, name="Clock A")
         VirtualClock.objects.create(user_owner=user, name="Clock B")
 
-        response = client.get("/clocks/", auth=user)
+        response = client.get("/clocks/", headers={"Authorization": f"bearer {str(user.api_token)}"})
 
         self.assertEqual(response.status_code, 200)
         data = response.json()
@@ -89,7 +89,7 @@ class ClockTests(TestCase):
             "tick_enabled": True,
         }
 
-        response = client.put("/clocks/", json=payload, auth=user)
+        response = client.put("/clocks/", json=payload, headers={"Authorization": f"bearer {str(user.api_token)}"})
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertIn("name", data["changed_fields"])
@@ -105,7 +105,8 @@ class ClockTests(TestCase):
         clock = VirtualClock.objects.create(user_owner=owner, name="Clock1")
 
         payload = {"id": clock.private_id, "allowed_users": [str(stranger.id)]}
-        response = client.put("/clocks/", json=payload, auth=stranger)
+        response = client.put("/clocks/", json=payload,
+                              headers={"Authorization": f"Bearer {str(stranger.api_token)}"})
 
         self.assertEqual(response.status_code, 403)
         self.assertEqual(response.json()["detail"], "Permission denied")
@@ -118,4 +119,4 @@ class ClockTests(TestCase):
         response = client.get(f"/clocks/{clock_id}/", headers={"Authorization": f"bearer {str(user.api_token)}"})
 
         self.assertEqual(response.status_code, 404)
-        self.assertEqual(response.json()["detail"], "Not Found")
+        self.assertEqual(response.json()["detail"], "Not found")

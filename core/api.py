@@ -35,10 +35,10 @@ def get_v_clock_controller(request, clock_id: Optional[str] = None) -> tuple[Vir
                 clock = VirtualClock.objects.get(private_id=clock_id)
             except (VirtualClock.DoesNotExist, ValueError, ValidationError):
                 logger.error(f"Clock not found for id: {clock_id}")
-                raise Http404()
+                raise HttpError(status_code=404, message="Not found")
 
         if not (user == clock.user_owner or user in clock.allowed_users.all()):
-            raise PermissionDenied("You do not have access to this clock")
+            raise HttpError(status_code=403, message="Permission denied")
         elif clock.user_owner == user:
             logger.info(f"User {user} requested it's own clock {clock_id}")
         else:
