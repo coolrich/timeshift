@@ -11,6 +11,10 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 import os
 from pathlib import Path
+
+import django
+from django.contrib.auth import get_user_model
+from django.core.management import call_command
 from dotenv import load_dotenv
 import dj_database_url
 
@@ -83,17 +87,48 @@ WSGI_APPLICATION = 'django_project.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+# ======================
+# DATABASE CONFIGURATION
+# ======================
 if os.environ.get('DATABASE_URL'):
+    # Для Render або будь-якого середовища з DATABASE_URL
     DATABASES = {
-        'default': dj_database_url.config(conn_max_age=600, ssl_require=True)
+        'default': dj_database_url.config(
+            conn_max_age=600,
+            ssl_require=True
+        )
     }
 else:
+    # Локально — SQLite
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
+
+# ======================
+# AUTOMATIC MIGRATIONS & SUPERUSER
+# ======================
+# Виконуємо це лише у продакшені (DATABASE_URL встановлено)
+if os.environ.get('DATABASE_URL'):
+    try:
+        # Налаштовуємо Django
+        django.setup()
+        # Міграції
+        call_command('migrate', interactive=False)
+        # Створення суперюзера (тільки якщо ще немає)
+        User = get_user_model()
+        if not User.objects.filter(username='admin').exists():
+            User.objects.create_superuser(
+                username='admin',
+                email='admin@example.com',
+                password='adminpassword'
+            )
+            print("Superuser created.")
+    except Exception as e:
+        print(f"Startup migration/superuser skipped or failed: {e}")
+
 
 
 # Password validation
