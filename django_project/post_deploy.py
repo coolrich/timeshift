@@ -23,5 +23,5 @@ def run():
                 password=os.environ.get('PASSWORD', 'adminpassword')
             )
             print("Superuser created.")
-
+    # call_command('collectstatic', '--noinput')
     print("Post-deploy script finished")
