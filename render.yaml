@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: timeshift
+    env: python
+    plan: free
+    buildCommand: |
+      python manage.py collectstatic --noinput
