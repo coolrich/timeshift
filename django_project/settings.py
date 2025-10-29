@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 import os
+from os import getenv
 from pathlib import Path
 
 import django
@@ -119,11 +120,11 @@ if os.environ.get('DATABASE_URL'):
         call_command('migrate', interactive=False)
         # Створення суперюзера (тільки якщо ще немає)
         User = get_user_model()
-        if not User.objects.filter(username='admin').exists():
+        if not User.objects.filter(USERNAME='admin').exists():
             User.objects.create_superuser(
-                username='admin',
-                email='admin@example.com',
-                password='adminpassword'
+                USERNAME=os.environ.get('USERNAME'),
+                email=os.environ.get('EMAIL'),
+                PASSWORD=os.environ.get('PASSWORD')
             )
             print("Superuser created.")
     except Exception as e:
