@@ -33,7 +33,7 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 # TODO: write code that makes DEBUG = True for local development and False for production
-DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = ["*",  'localhost', '127.0.0.1']
 
