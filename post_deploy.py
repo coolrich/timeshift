@@ -25,3 +25,6 @@ def run():
             print("Superuser created.")
     # call_command('collectstatic', '--noinput')
     print("Post-deploy script finished")
+
+if __name__ == '__main__':
+    run()
