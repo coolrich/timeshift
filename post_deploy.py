@@ -3,6 +3,8 @@ from django.core.management import call_command
 from django.contrib.auth import get_user_model
 import django
 
+print("Post-deploy script started")
+
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'django_project.settings')
 django.setup()
 
@@ -20,3 +22,5 @@ if os.environ.get('DATABASE_URL'):
             password=os.environ.get('PASSWORD', 'adminpassword')
         )
         print("Superuser created.")
+
+print("Post-deploy script finished")
