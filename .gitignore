@@ -3,4 +3,3 @@
 db.sqlite3
 /.idea/.name
 /.idea/timeshift.iml
-/core/migrations/
