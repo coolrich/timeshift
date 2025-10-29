@@ -5,3 +5,5 @@ services:
     plan: free
     buildCommand: |
       python manage.py collectstatic --noinput
+      python post_deploy.py
+    

@@ -32,10 +32,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-# TODO: write code that makes DEBUG = True for local development and False for production
-DEBUG = False
+DEBUG = os.getenv("DEBUG", "False") == "True"
 
-ALLOWED_HOSTS = ["*",  'localhost', '127.0.0.1']
+if DEBUG:
+    ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
+else:
+    ALLOWED_HOSTS = [os.getenv("RENDER_EXTERNAL_HOSTNAME"), "127.0.0.1"]
 
 
 # Application definition
