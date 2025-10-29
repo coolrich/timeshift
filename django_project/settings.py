@@ -19,10 +19,7 @@ from django.core.management import call_command
 from dotenv import load_dotenv
 import dj_database_url
 
-
-
 load_dotenv()
-
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -107,30 +104,6 @@ else:
             'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
-
-# ======================
-# AUTOMATIC MIGRATIONS & SUPERUSER
-# ======================
-# Виконуємо це лише у продакшені (DATABASE_URL встановлено)
-if os.environ.get('DATABASE_URL'):
-    try:
-        # Налаштовуємо Django
-        django.setup()
-        # Міграції
-        call_command('migrate', interactive=False)
-        # Створення суперюзера (тільки якщо ще немає)
-        User = get_user_model()
-        if not User.objects.filter(USERNAME='admin').exists():
-            User.objects.create_superuser(
-                USERNAME=os.environ.get('USERNAME'),
-                email=os.environ.get('EMAIL'),
-                PASSWORD=os.environ.get('PASSWORD')
-            )
-            print("Superuser created.")
-    except Exception as e:
-        print(f"Startup migration/superuser skipped or failed: {e}")
-
-
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
