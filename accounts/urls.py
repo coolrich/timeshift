@@ -1,11 +1,17 @@
 from django.urls import path
-from .views import SignUpView, ProfileView
-
+from .views import SignUpView, ProfileView, ProfileDashboardView, ProfileSettingsView, ProfileClocksView, \
+    ProfileTokensView, ClockDetailView, ClockCreateView
 from django.contrib.auth import views as auth_views
 
 urlpatterns = [
     path('login/', auth_views.LoginView.as_view(template_name='login.html'), name='login'),
     path('logout/', auth_views.LogoutView.as_view(next_page='/login/'), name='logout'),
     path('signup/', SignUpView.as_view(), name='signup'),
-    path('profile/', ProfileView.as_view(), name='profile')
+    path('profile/', ProfileView.as_view(), name='profile'),
+    path('', ProfileDashboardView.as_view(), name='profile_dashboard'),
+    path('tokens/', ProfileTokensView.as_view(), name='profile_tokens'),
+    path('clocks/', ProfileClocksView.as_view(), name='profile_clocks'),
+    path("clocks/<int:pk>/", ClockDetailView.as_view(), name="clock_detail"),
+    path("clocks/new/", ClockCreateView.as_view(), name="clock_create"),
+    path('settings/', ProfileSettingsView.as_view(), name='profile_settings'),
 ]

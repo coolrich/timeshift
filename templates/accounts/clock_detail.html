@@ -1,0 +1,8 @@
+{% extends "profile/profile_base.html" %}
+{% block title %}{{ clock.name }} – {{ ENV_SITE_NAME }}{% endblock %}
+
+{% block profile_content %}
+<h2>{{ clock.name }}</h2>
+<p><strong>API токен:</strong> <code>{{ clock.api_token }}</code></p>
+<p><strong>Активність:</strong> {{ clock.tick_enabled|yesno:"увімкнений,вимкнений" }}</p>
+{% endblock %}

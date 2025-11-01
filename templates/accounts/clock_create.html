@@ -1,0 +1,12 @@
+{% extends "profile/profile_base.html" %}
+{% block title %}Новий годинник – {{ ENV_SITE_NAME }}{% endblock %}
+
+{% block profile_content %}
+<h2 class="mb-4">Створення нового віртуального годинника</h2>
+
+<form method="post">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <button type="submit" class="btn btn-primary">Створити</button>
+</form>
+{% endblock %}

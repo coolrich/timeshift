@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Профіль – {{ ENV_SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="row">
+    <!-- Sidebar -->
+    <div class="col-md-3 col-lg-2 mb-4">
+      <div class="list-group shadow-sm rounded">
+        <a href="{% url 'profile_dashboard' %}" class="list-group-item list-group-item-action {% if request.path == '/profile/' %}active{% endif %}">
+          <i class="bi bi-speedometer2 me-2"></i> Головна
+        </a>
+        <a href="{% url 'profile_tokens' %}" class="list-group-item list-group-item-action {% if 'tokens' in request.path %}active{% endif %}">
+          <i class="bi bi-key me-2"></i> API Токени
+        </a>
+        <a href="{% url 'profile_clocks' %}" class="list-group-item list-group-item-action {% if 'clocks' in request.path %}active{% endif %}">
+          <i class="bi bi-clock me-2"></i> Віртуальні годинники
+        </a>
+        <a href="{% url 'profile_settings' %}" class="list-group-item list-group-item-action {% if 'settings' in request.path %}active{% endif %}">
+          <i class="bi bi-gear me-2"></i> Налаштування
+        </a>
+      </div>
+    </div>
+
+    <!-- Main content -->
+    <div class="col-md-9 col-lg-10">
+      {% block profile_content %}{% endblock %}
+    </div>
+  </div>
+</div>
+{% endblock %}

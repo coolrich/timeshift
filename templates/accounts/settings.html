@@ -1,0 +1,12 @@
+{% extends "accounts/profile_base.html" %}
+{% block title %}Налаштування – {{ ENV_SITE_NAME }}{% endblock %}
+
+{% block profile_content %}
+<h2 class="mb-4">Налаштування акаунта</h2>
+
+<form method="post">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <button type="submit" class="btn btn-primary">Зберегти</button>
+</form>
+{% endblock %}
