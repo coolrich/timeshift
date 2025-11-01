@@ -19,6 +19,3 @@ class HomepageTests(SimpleTestCase):
         response = self.client.get(reverse("home"))
         self.assertContains(response, "Інструмент віртуального часу для розробників і тестувальників. Симулюйте "
                                       "часові сценарії, створюючи віртуальні годинники, прискорюйте або зупиняйте час.")
-
-
-class

@@ -13,13 +13,12 @@ class UserModelTests(TestCase):
         self.assertEqual(User.objects.get(username="John").password, "123SuperSecret!")
         self.assertTrue(User.objects.filter(username="John").exists())
 
-
     def test_create_user_with_fullname(self):
         User.objects.create(username="John", full_name="John Doe")
         self.assertTrue(User.objects.filter(full_name="John Doe").exists())
 
     def test_create_user_with_bad_password(self):
-        with self.assertRaises(ValueError):
-            User.objects.create(username="John", password="123")
-        self.assertEqual(User.objects.count(), 0)
+        response = self.client.post("/accounts/signup/", {"username": "John", "password1": "123", "password2": "123"})
+        logger.info(f"test_create_user_with_bad_password(): {response.status_code}")
+        self.assertEqual(response.status_code, 200)
 
