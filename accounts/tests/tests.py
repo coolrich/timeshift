@@ -6,8 +6,10 @@ User = get_user_model()
 class TestAccounts(TestCase):
     def test_log_in_out(self):
         User.objects.create_user(username='testuser', password='testpass')
-        logged_in = self.client.login(username='testuser', password='testpass')
-        self.assertTrue(logged_in)
+        # logged_in = self.client.login(username='testuser', password='testpass')
+        # self.assertTrue(logged_in)
+        response = self.client.post("/accounts/login/", {'username': 'testuser', 'password': 'testpass'})
+        self.assertEqual(response.status_code, 302)
         self.assertEqual(self.client.session.get('_auth_user_id'), '1')
         self.assertEqual(self.client.session.get('_auth_user_backend'), 'django.contrib.auth.backends.ModelBackend')
         self.assertFalse(self.client.logout())

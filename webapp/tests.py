@@ -13,8 +13,12 @@ class HomepageTests(SimpleTestCase):
 
     def test_template_name_correct(self):
         response = self.client.get(reverse("home"))
-        self.assertTemplateUsed(response, "index.html")
+        self.assertTemplateUsed(response, "webapp/index.html")
 
     def test_template_content(self):
         response = self.client.get(reverse("home"))
-        self.assertContains(response, "<h1>Homepage</h1>")
+        self.assertContains(response, "Інструмент віртуального часу для розробників і тестувальників. Симулюйте "
+                                      "часові сценарії, створюючи віртуальні годинники, прискорюйте або зупиняйте час.")
+
+
+class
