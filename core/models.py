@@ -11,14 +11,12 @@ import logging
 logger = logging.getLogger(__name__)
 
 class VirtualClock(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, unique=True)
-    private_id = models.PositiveIntegerField(unique=True, editable=False, default=1)
-
+    id = models.PositiveIntegerField(primary_key=True, unique=True, editable=False, null=False)
     user_owner = models.ForeignKey(
         get_user_model(), on_delete=models.CASCADE, related_name="virtual_clocks"
     )
     name = models.CharField(max_length=255, blank=True, null=True)
-    api_token = models.CharField(max_length=64, unique=True, editable=False)
+    api_token = models.CharField(max_length=64, unique=True, editable=False, null=False)
     allowed_users = models.ManyToManyField(
         get_user_model(), related_name="shared_clocks", blank=True
     )
@@ -42,19 +40,24 @@ class VirtualClock(models.Model):
                     logger.info(f"core.models.VirtualClock.save(): new api_token created: {self.api_token}")
                     break
 
-        last = VirtualClock.objects.all().order_by("-private_id").first()
-        # logger.info(f"core.models.VirtualClock.save(): last private_id: {last.private_id}")
+        last = VirtualClock.objects.all().order_by("-id").first()
+        logger.debug(f"core.models.VirtualClock.save(): last: {last}")
         if not last:
-            logger.info(f"core.models.VirtualClock.save(): self.private_id is not set")
-        self.private_id = 1 if not last else int(last.private_id) + 1
-        logger.info(f"core.models.VirtualClock.save(): self.private_id: {self.private_id}")
+            logger.debug(f"core.models.VirtualClock.save(): created first clock")
+            self.id = 1
+        else:
+            logger.debug(f"core.models.VirtualClock.save(): self.id is {self.id}")
+            if not self.id:
+                logger.debug(f"core.models.VirtualClock.save(): initiated id: {int(last.id) + 1}")
+                self.id = int(last.id) + 1
+        logger.debug(f"core.models.VirtualClock.save(): self.id is {self.id} | name: {self.name}")
         super().save(*args, **kwargs)
 
     class Meta:
-        ordering = ["private_id"]
+        ordering = ["id"]
 
     def __str__(self):
-        return f"VirtualClock '{self.name or self.id}' of {self.user_owner.username}"
+        return f"VirtualClock '{self.name}' of {self.user_owner.username} with id: {self.id}"
 
 
 # Сигнал для відлову .add() в allowed_users

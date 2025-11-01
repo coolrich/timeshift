@@ -1,6 +1,6 @@
 from django.urls import path
 from .views import SignUpView, ProfileView, ProfileDashboardView, ProfileSettingsView, ProfileClocksView, \
-    ProfileTokensView, ClockDetailView, ClockCreateView
+    ProfileTokensView, ClockDetailView, ClockCreateView, ClockDeleteView
 from django.contrib.auth import views as auth_views
 
 urlpatterns = [
@@ -13,5 +13,6 @@ urlpatterns = [
     path('clocks/', ProfileClocksView.as_view(), name='profile_clocks'),
     path("clocks/<int:pk>/", ClockDetailView.as_view(), name="clock_detail"),
     path("clocks/new/", ClockCreateView.as_view(), name="clock_create"),
+    path("clocks/<int:pk>/delete/", ClockDeleteView.as_view(), name="clock_delete"),
     path('settings/', ProfileSettingsView.as_view(), name='profile_settings'),
 ]

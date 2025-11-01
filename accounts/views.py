@@ -1,11 +1,14 @@
 from django.contrib.auth import login
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse_lazy
-from django.views.generic import CreateView, TemplateView, ListView, UpdateView, DetailView
+from django.views.generic import CreateView, TemplateView, ListView, UpdateView, DetailView, DeleteView
 
 from core.models import VirtualClock
 from .forms import TimeShiftUserCreationForm, UserSettingsForm
 from django.contrib.auth import get_user_model
+from logging import getLogger
+
+logger = getLogger(__name__)
 
 class SignUpView(CreateView):
     form_class = TimeShiftUserCreationForm
@@ -79,13 +82,24 @@ class ClockDetailView(LoginRequiredMixin, DetailView):
 
 class ClockCreateView(LoginRequiredMixin, CreateView):
     model = VirtualClock
-    fields = ["name"]  # або що ти дозволяєш вводити
+    fields = ["name"]
     template_name = "accounts/clock_create.html"
     success_url = reverse_lazy("profile_clocks")
 
     def form_valid(self, form):
-        form.instance.user = self.request.user
+        # додаємо власника
+        form.instance.user_owner = self.request.user
+        logger.debug(f"Creating clock for user {self.request.user} with name {form.cleaned_data['name']}")
         return super().form_valid(form)
+
+class ClockDeleteView(LoginRequiredMixin, DeleteView):
+    model = VirtualClock
+    template_name = "accounts/clock_confirm_delete.html"
+    success_url = reverse_lazy("profile_clocks")
+
+    def get_queryset(self):
+        # дозволяємо видаляти лише свої годинники
+        return self.request.user.virtual_clocks.all()
 
 # ⚙️ 4. Налаштування користувача
 class ProfileSettingsView(LoginRequiredMixin, UpdateView):

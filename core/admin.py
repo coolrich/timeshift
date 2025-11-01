@@ -22,7 +22,7 @@ class VirtualClockAdminForm(forms.ModelForm):
 class VirtualClockAdmin(admin.ModelAdmin):
     form = VirtualClockAdminForm
     filter_horizontal = ("allowed_users",)
-    list_display = ("user_owner", "private_id", "api_token")
+    list_display = ("user_owner", "id", "api_token")
 
     # Щоб не показувати власника у списку для allowed_users
     def formfield_for_manytomany(self, db_field, request, **kwargs):

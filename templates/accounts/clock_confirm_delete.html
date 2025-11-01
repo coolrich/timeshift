@@ -1,0 +1,14 @@
+{% extends "accounts/profile_base.html" %}
+{% block title %}Видалення годинника – {{ ENV_SITE_NAME }}{% endblock %}
+
+{% block profile_content %}
+<div class="card shadow-sm p-4">
+  <h2 class="mb-3">Підтвердити видалення</h2>
+  <p>Ви впевнені, що хочете видалити годинник <strong>{{ object.name }}</strong>?</p>
+  <form method="post">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-danger">Видалити</button>
+    <a href="{% url 'profile_clocks' %}" class="btn btn-secondary">Скасувати</a>
+  </form>
+</div>
+{% endblock %}

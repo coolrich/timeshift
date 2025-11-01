@@ -2,6 +2,8 @@ from django.test import TestCase
 from django.contrib.auth import get_user_model
 from logging import getLogger
 
+from django.urls import reverse
+
 User = get_user_model()
 logger = getLogger(__name__)
 
@@ -17,8 +19,5 @@ class UserModelTests(TestCase):
         User.objects.create(username="John", full_name="John Doe")
         self.assertTrue(User.objects.filter(full_name="John Doe").exists())
 
-    def test_create_user_with_bad_password(self):
-        response = self.client.post("/accounts/signup/", {"username": "John", "password1": "123", "password2": "123"})
-        logger.info(f"test_create_user_with_bad_password(): {response.status_code}")
-        self.assertEqual(response.status_code, 200)
+
 

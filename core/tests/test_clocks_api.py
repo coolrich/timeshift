@@ -60,7 +60,7 @@ class ClockTests(TestCase):
         user = self.user
         clock = VirtualClock.objects.create(user_owner=user, name="TestClock")
 
-        response = client.get(f"/clocks/{clock.private_id}/", headers={"Authorization": f"bearer {str(user.api_token)}"})
+        response = client.get(f"/clocks/{clock.id}/", headers={"Authorization": f"bearer {str(user.api_token)}"})
 
         self.assertEqual(response.status_code, 200)
         data = response.json()
@@ -84,7 +84,7 @@ class ClockTests(TestCase):
         user = self.user
         clock = VirtualClock.objects.create(user_owner=user, name="Old Name", tick_enabled=False)
         payload = {
-            "id": clock.private_id,
+            "id": clock.id,
             "name": "New Name",
             "tick_enabled": True,
         }
@@ -104,7 +104,7 @@ class ClockTests(TestCase):
         stranger = User.objects.create_user(username="nick")
         clock = VirtualClock.objects.create(user_owner=owner, name="Clock1")
 
-        payload = {"id": clock.private_id, "allowed_users": [str(stranger.id)]}
+        payload = {"id": clock.id, "allowed_users": [str(stranger.id)]}
         response = client.put("/clocks/", json=payload,
                               headers={"Authorization": f"Bearer {str(stranger.api_token)}"})
 
@@ -115,7 +115,7 @@ class ClockTests(TestCase):
         user = self.user
         clock = VirtualClock.objects.create(user_owner=user, name="Clock1")
 
-        clock_id = int(clock.private_id) + 1
+        clock_id = int(clock.id) + 1
         response = client.get(f"/clocks/{clock_id}/", headers={"Authorization": f"bearer {str(user.api_token)}"})
 
         self.assertEqual(response.status_code, 404)

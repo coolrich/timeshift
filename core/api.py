@@ -27,12 +27,12 @@ def get_v_clock_controller(request, clock_id: Optional[str] = None) -> tuple[Vir
     user = request.auth
     if clock_id:
         try:
-            clock = user.virtual_clocks.get(private_id=clock_id)
+            clock = user.virtual_clocks.get(id=clock_id)
         except (VirtualClock.DoesNotExist, ValueError):
-            logger.error(f"Clock not found for user {user} private_id: {clock_id}")
+            logger.error(f"Clock not found for user {user} id: {clock_id}")
             try:
-                logger.info(f"Looking for shared clock with private_id: {clock_id}")
-                clock = VirtualClock.objects.get(private_id=clock_id)
+                logger.info(f"Looking for shared clock with id: {clock_id}")
+                clock = VirtualClock.objects.get(id=clock_id)
             except (VirtualClock.DoesNotExist, ValueError, ValidationError):
                 logger.error(f"Clock not found for id: {clock_id}")
                 raise HttpError(status_code=404, message="Not found")
@@ -128,7 +128,7 @@ def set_real(request, clock_id: Optional[str] = None):
     return {
         "status": "success",
         "data": TimeData(
-            clock_id=controller.virtual_clock.private_id,
+            clock_id=controller.virtual_clock.id,
             user_owner_id=controller.get_user_owner().id,
             name=controller.virtual_clock.name,
             time=controller.get_time(),
@@ -140,6 +140,7 @@ def set_real(request, clock_id: Optional[str] = None):
 # ================
 # CRUD ops
 # ================
+
 
 @router.post("/clocks/", response={201:VirtualClockInfo, 403:ErrorClockResponse})
 def create_clock(request, payload: Optional[CreateClockRequest] = None):
@@ -165,7 +166,7 @@ def retrieve_clock(request, clock_id: str):
     controller, user = get_v_clock_controller(request, clock_id)
 
     return TimeData(
-        clock_id=controller.virtual_clock.private_id,
+        clock_id=controller.virtual_clock.id,
         user_owner_id=controller.get_user_owner().id,
         name=controller.virtual_clock.name,
         time=controller.get_time(),
@@ -189,7 +190,7 @@ def list_clocks(request):
             allowed_users = list(clock.allowed_users.values_list("id", flat=True))
 
             clocks.append(TimeData(
-                clock_id=clock.private_id,
+                clock_id=clock.id,
                 user_owner_id=owner.id,
                 name=clock.name,
                 time=controller.get_time(),
@@ -198,7 +199,7 @@ def list_clocks(request):
             ))
         else:
             clocks.append(TimeData(
-                clock_id=clock.private_id,
+                clock_id=clock.id,
                 user_owner_id=owner.id,
                 name=clock.name,
                 time=controller.get_time(),
@@ -211,7 +212,7 @@ def list_clocks(request):
 @router.put("/clocks/", response={200:TimeDataUpdate, 403:ErrorClockResponse})
 def update_clock(request, payload: ClockUpdateRequest):
     payload_dict = payload.dict()
-    logger.info(f"core.api.update_clock(): payload_dict: {payload_dict}")
+    logger.debug(f"core.api.update_clock(): payload_dict: {payload_dict}")
     clock_id = payload_dict["id"]
     controller, user = get_v_clock_controller(request, clock_id)
     clock = controller.virtual_clock
@@ -252,7 +253,7 @@ def update_clock(request, payload: ClockUpdateRequest):
     logger.info(f"core.api.update_clock(): changed_fields: {changed_fields}")
     controller.save()
     return TimeDataUpdate(
-        id=clock.private_id,
+        id=clock.id,
         name=clock.name if "name" in changed_fields else None,
         time=controller.get_time() if "time" in changed_fields else None,
         tick_enabled=controller.tick_status if "tick_enabled" in changed_fields else None,

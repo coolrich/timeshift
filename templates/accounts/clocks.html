@@ -2,22 +2,35 @@
 {% block title %}Мої годинники – {{ ENV_SITE_NAME }}{% endblock %}
 
 {% block profile_content %}
-<h2 class="mb-4">Мої віртуальні годинники</h2>
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="mb-0">Мої віртуальні годинники</h2>
+  <a href="{% url 'clock_create' %}" class="btn btn-primary">➕ Створити годинник</a>
+</div>
 
 {% if user.virtual_clocks.exists %}
   <div class="list-group shadow-sm">
     {% for clock in user.virtual_clocks.all %}
-      <a href="{% url 'clock_detail' clock.private_id %}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-        <div>
-          <h5 class="mb-0">{{ clock.name }}</h5>
-          <small class="text-muted">ID: {{ clock.id }}</small>
-        </div>
-        <span class="badge bg-primary rounded-pill">{{ clock.tick_enabled|yesno:"активний,вимкнений" }}</span>
-      </a>
-    {% endfor %}
+  <div class="list-group-item d-flex justify-content-between align-items-center">
+    <div>
+      <h5 class="mb-0">
+        <a href="{% url 'clock_detail' clock.id %}" class="text-decoration-none">
+          {{ clock.name }}
+        </a>
+      </h5>
+      <small class="text-muted">ID: {{ clock.id }}</small>
+    </div>
+
+    <div class="d-flex align-items-center">
+      <span class="badge bg-primary rounded-pill me-3">
+        {{ clock.tick_enabled|yesno:"активний,вимкнений" }}
+      </span>
+      <a href="{% url 'clock_delete' clock.id %}" class="btn btn-sm btn-outline-danger">🗑️</a>
+    </div>
+  </div>
+{% endfor %}
+
   </div>
 {% else %}
   <p class="text-muted">Ще не створено жодного годинника.</p>
-  <a href="{% url 'clock_create' %}" class="btn btn-primary mt-3">Створити годинник</a>
 {% endif %}
 {% endblock %}

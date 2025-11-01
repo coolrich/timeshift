@@ -63,7 +63,7 @@ class SetRealResponse(Schema):
     message: Optional[str] = None
 
 class VirtualClockInfo(Schema):
-    id: str  # UUID
+    id: int
     name: Optional[str] = None
     tick_enabled: bool
     current_time: str  # ISO 8601
