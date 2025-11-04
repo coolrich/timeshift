@@ -1,10 +1,16 @@
+from http.client import responses
+from importlib.metadata import requires
+
 from django.test import TestCase
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 
+from core.models import VirtualClock
+
 User = get_user_model()
 
 class SignUpViewTests(TestCase):
+
     def test_signup_get_renders_form(self):
         url = reverse("signup")
         response = self.client.get(url)
@@ -21,7 +27,7 @@ class SignUpViewTests(TestCase):
         }
         response = self.client.post(url, data)
         # перевіряємо, що редірект на profile
-        self.assertRedirects(response, reverse("profile"))
+        self.assertRedirects(response, reverse("profile_dashboard"))
         # користувач створений
         self.assertTrue(User.objects.get(username="newuser"))
         # користувач залогінений
@@ -29,10 +35,11 @@ class SignUpViewTests(TestCase):
         self.assertEqual(int(self.client.session["_auth_user_id"]), user.id)
 
 
-class ProfileViewTests(TestCase):
+class ProfileDashboardViewTests(TestCase):
+
     def setUp(self):
         self.user = User.objects.create_user(username="emily", password="verySecret123!")
-        self.url = reverse("profile")
+        self.url = reverse("profile_dashboard")
 
     def test_profile_requires_login(self):
         response = self.client.get(self.url)
@@ -45,11 +52,127 @@ class ProfileViewTests(TestCase):
         self.assertTrue(is_logged_in)
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, "accounts/profile.html")
+        self.assertTemplateUsed(response, "accounts/dashboard.html")
         # у контексті є virtual_clocks
+        self.assertIn("total_clocks", response.context)
+        self.assertIn("latest_clock", response.context)
+
+class ProfileTokensViewTests(TestCase):
+
+    def setUp(self):
+        self.user = User.objects.create_user(username="emily", password="verySecret123!")
+        VirtualClock.objects.create(user_owner=self.user)
+        self.client.login(username="emily", password="verySecret123!")
+        self.url = reverse("profile_tokens")
+
+    def test_profile_tokens_context(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "accounts/tokens.html")
+        self.assertIn("user", response.context)
         self.assertIn("virtual_clocks", response.context)
-        self.assertQuerySetEqual(
-            response.context["virtual_clocks"],
-            self.user.virtual_clocks.all(),
-            transform=lambda x: x
-        )
+
+class ProfileClocksViewTest(TestCase):
+
+    def setUp(self):
+        self.user = User.objects.create_user(username="emily", password="verySecret123!")
+        VirtualClock.objects.create(user_owner=self.user)
+        self.client.login(username="emily", password="verySecret123!")
+        self.url = reverse("profile_clocks")
+
+    def test_profile_clocks_context(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "accounts/clocks.html")
+        self.assertIn("clocks", response.context)
+        self.assertQuerySetEqual(response.context["clocks"], VirtualClock.objects.filter(user_owner=self.user))
+
+class ClockDetailViewTest(TestCase):
+
+    def setUp(self):
+        self.user = User.objects.create_user(username="emily", password="verySecret123!")
+        self.clock = VirtualClock.objects.create(user_owner=self.user)
+        self.client.login(username="emily", password="verySecret123!")
+        self.url = reverse("clock_detail", args=[self.clock.id])
+
+    def test_clock_detail_context(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "accounts/clock_detail.html")
+        self.assertIn("clock", response.context)
+        self.assertEqual(response.context["clock"], self.clock)
+        self.assertIn(response.context["clock"], VirtualClock.objects.filter(user_owner=self.user))
+
+
+class ClockCreateViewTest(TestCase):
+
+    def setUp(self):
+        self.user = User.objects.create_user(username="emily", password="verySecret123!")
+        self.client.login(username="emily", password="verySecret123!")
+        self.url = reverse("clock_create")
+
+    def test_create_view_requires_login(self):
+        self.client.logout()
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("login", response.url)
+
+    def test_post_creates_clock(self):
+        response = self.client.post(self.url)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(VirtualClock.objects.count(), 1)
+
+    def test_post_creates_clock_with_name(self):
+        response = self.client.post(self.url, {"name": "Test Clock"})
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(VirtualClock.objects.count(), 1)
+        self.assertEqual(VirtualClock.objects.first().name, "Test Clock")
+
+    def test_clock_create_view_redirects_to_profile_clocks(self):
+        response = self.client.post(self.url)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("profile_clocks"))
+
+    def test_clock_create_get_renders_form(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "accounts/clock_create.html")
+        self.assertIn("form", response.context)
+        self.assertIn("name", response.context["form"].fields)
+
+class ClockDeleteViewTest(TestCase):
+
+    def setUp(self):
+        self.user = User.objects.create_user(username="emily", password="verySecret123!")
+        self.clock = VirtualClock.objects.create(user_owner=self.user)
+        self.client.login(username="emily", password="verySecret123!")
+        self.url = reverse("clock_delete", args=[self.clock.id])
+
+    def test_delete_view_requires_login(self):
+        self.client.logout()
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("login", response.url)
+
+    def test_delete_view_post_deletes_clock(self):
+        response = self.client.post(self.url)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(VirtualClock.objects.count(), 0)
+
+    def test_delete_view_get_renders_form(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "accounts/clock_confirm_delete.html")
+
+    def test_delete_view_redirects_to_profile_clocks(self):
+        response = self.client.delete(self.url)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("profile_clocks"))
+
+    def test_user_cannot_delete_someone_elses_clock(self):
+        other = User.objects.create_user(username="john", password="12345")
+        self.client.login(username="john", password="12345")
+        response = self.client.post(self.url)
+        self.assertEqual(response.status_code, 404)  # або 403 — залежно від твоєї реалізації
+
+

@@ -9,7 +9,7 @@
     <div class="card shadow-sm">
       <div class="card-body">
         <h5 class="card-title text-muted">Віртуальні годинники</h5>
-        <h2>{{ user.virtual_clocks.count }}</h2>
+        <h2>{{ total_clocks }}</h2>
       </div>
     </div>
   </div>
@@ -17,8 +17,17 @@
   <div class="col-md-6 col-xl-3">
     <div class="card shadow-sm">
       <div class="card-body">
-        <h5 class="card-title text-muted">Останній вхід</h5>
+        <h5 class="card-title text-muted">Дата останнього входу</h5>
         <p class="fs-5">{{ user.last_login|date:"d.m.Y H:i" }}</p>
+      </div>
+    </div>
+  </div>
+
+    <div class="col-md-6 col-xl-3">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title text-muted">Дата створення останнього годинника</h5>
+        <p class="fs-5">{{ latest_clock.created_at|date:"d.m.Y H:i" }}</p>
       </div>
     </div>
   </div>
@@ -26,9 +35,9 @@
   <div class="col-md-12">
     <div class="card shadow-sm mt-3">
       <div class="card-body">
-        <h5 class="card-title">API Токен</h5>
+        <h5 class="card-title">API Токен користувача</h5>
         <div class="d-flex align-items-center">
-          <code id="user-token">{{ user.api_token|slice:":8" }}•••{{ user.api_token|slice:"-4:" }}</code>
+          <code id="user-token">{{ api_token|slice:":8" }}•••{{ api_token|slice:"-4:" }}</code>
           <button class="btn btn-sm btn-outline-secondary ms-2" onclick="copyToken('{{ user.api_token }}')">Копіювати</button>
         </div>
       </div>

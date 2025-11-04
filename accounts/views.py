@@ -12,7 +12,7 @@ logger = getLogger(__name__)
 
 class SignUpView(CreateView):
     form_class = TimeShiftUserCreationForm
-    success_url = reverse_lazy("profile")
+    success_url = reverse_lazy("profile_dashboard")
     template_name = "registration/signup.html"
 
     def form_valid(self, form):
@@ -21,21 +21,22 @@ class SignUpView(CreateView):
         login(self.request, user)
         return response
 
-class ProfileView(LoginRequiredMixin, TemplateView):
-    model = get_user_model()
-    template_name = "accounts/profile.html"
-    login_url = reverse_lazy("login")
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['virtual_clocks'] = self.request.user.virtual_clocks.all()
-        return context
+# class ProfileView(LoginRequiredMixin, TemplateView):
+#     model = get_user_model()
+#     template_name = "accounts/profile.html"
+#     login_url = reverse_lazy("login")
+#
+#     def get_context_data(self, **kwargs):
+#         context = super().get_context_data(**kwargs)
+#         context['virtual_clocks'] = self.request.user.virtual_clocks.all()
+#         return context
 
 User = get_user_model()
 
 # 🧭 1. Головна сторінка (дашборд)
 class ProfileDashboardView(LoginRequiredMixin, TemplateView):
     template_name = "accounts/dashboard.html"
+    login_url = reverse_lazy("login")
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
