@@ -37,7 +37,7 @@
       <div class="card-body">
         <h5 class="card-title">API Токен користувача</h5>
         <div class="d-flex align-items-center">
-          <code id="user-token">{{ api_token|slice:":8" }}•••{{ api_token|slice:"-4:" }}</code>
+          <code id="user-token">{{ user.api_token|slice:":8" }}•••{{ user.api_token|slice:"-4:" }}</code>
           <button class="btn btn-sm btn-outline-secondary ms-2" onclick="copyToken('{{ user.api_token }}')">Копіювати</button>
         </div>
       </div>

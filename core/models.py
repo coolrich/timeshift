@@ -50,7 +50,7 @@ class VirtualClock(models.Model):
             if not self.id:
                 logger.debug(f"core.models.VirtualClock.save(): initiated id: {int(last.id) + 1}")
                 self.id = int(last.id) + 1
-        logger.debug(f"core.models.VirtualClock.save(): self.id is {self.id} | name: {self.name}")
+        logger.debug(f"core.models.VirtualClock.save(): self.id is {self.id} | name: {self.name} | tick_enabled: {self.tick_enabled}")
         super().save(*args, **kwargs)
 
     class Meta:

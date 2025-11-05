@@ -116,3 +116,25 @@ class ProfileSettingsView(LoginRequiredMixin, UpdateView):
         response = super().form_valid(form)
         # можна додати повідомлення: messages.success(self.request, "Налаштування збережено.")
         return response
+
+class ClockControlView(LoginRequiredMixin, UpdateView):
+    model = VirtualClock
+    fields = ["tick_enabled"]
+    template_name = "accounts/clocks.html"
+    success_url = reverse_lazy("profile_clocks")
+
+    def get_queryset(self):
+        # дозволяємо контролювати лише свої годинники
+        return self.request.user.virtual_clocks.all()
+
+    # def post(self, request, *args, **kwargs):
+    #     virtual_clock = User.virtual_clocks.get(id=kwargs['pk'])
+    #     virtual_clock.tick_enabled = not virtual_clock.tick_enabled
+    #     logger.debug(f"Toggle tick: User {request.user.username} | Clock {virtual_clock.name} | Status {virtual_clock.tick_enabled}")
+    #     virtual_clock.save()
+    #     return super().post(request, *args, **kwargs)
+
+    # def get_context_data(self, **kwargs):
+    #     context = super().get_context_data(**kwargs)
+    #     context['is_ticking'] = getattr(self.request.user, "virtual_clocks", None)
+
