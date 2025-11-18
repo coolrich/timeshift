@@ -1,9 +1,10 @@
 from django.contrib.auth import login
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse_lazy
-from django.views.generic import CreateView, TemplateView, ListView, UpdateView, DetailView, DeleteView
+from django.views.generic import CreateView, TemplateView, ListView, UpdateView, DetailView, DeleteView, FormView
 
 from core.models import VirtualClock
+from core.services import VirtualClockController
 from .forms import TimeShiftUserCreationForm, UserSettingsForm
 from django.contrib.auth import get_user_model
 from logging import getLogger
@@ -66,10 +67,17 @@ class ProfileTokensView(LoginRequiredMixin, TemplateView):
 class ProfileClocksView(LoginRequiredMixin, ListView):
     model = VirtualClock
     template_name = "accounts/clocks.html"
+    fields = ["tick_enabled"]
     context_object_name = "clocks"
 
     def get_queryset(self):
         return self.request.user.virtual_clocks.all()
+
+
+    # def get_context_data(self, **kwargs):
+    #     context = super().get_context_data(**kwargs)
+    #     context["form"] = self.form_class()
+    #     return context
 
 class ClockDetailView(LoginRequiredMixin, DetailView):
     model = VirtualClock
@@ -79,6 +87,14 @@ class ClockDetailView(LoginRequiredMixin, DetailView):
     def get_queryset(self):
         # тільки годинники користувача
         return self.request.user.virtual_clocks.all()
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # vcc = VirtualClockController(self.request.user.virtual_clocks.get(id=self.kwargs["pk"]))
+        vcc = VirtualClockController(self.object)
+        context["current_time"] = vcc.get_time()
+        logger.debug(f"Current time: {vcc.get_time()}")
+        return context
 
 
 class ClockCreateView(LoginRequiredMixin, CreateView):
@@ -119,22 +135,20 @@ class ProfileSettingsView(LoginRequiredMixin, UpdateView):
 
 class ClockControlView(LoginRequiredMixin, UpdateView):
     model = VirtualClock
-    fields = ["tick_enabled"]
     template_name = "accounts/clocks.html"
+    fields = ["tick_enabled"]
     success_url = reverse_lazy("profile_clocks")
 
     def get_queryset(self):
         # дозволяємо контролювати лише свої годинники
         return self.request.user.virtual_clocks.all()
 
-    # def post(self, request, *args, **kwargs):
-    #     virtual_clock = User.virtual_clocks.get(id=kwargs['pk'])
-    #     virtual_clock.tick_enabled = not virtual_clock.tick_enabled
-    #     logger.debug(f"Toggle tick: User {request.user.username} | Clock {virtual_clock.name} | Status {virtual_clock.tick_enabled}")
-    #     virtual_clock.save()
+    # def get(self, request, *args, **kwargs):
+    #     # vc = self.request.user.virtual_clocks.get(id=self.kwargs["pk"])
+    #     # vcc = VirtualClockController(vc)
+    #     logger.debug(f"ClockControlView.post(): request.POST: {self.request.GET}")
+    #     self.request.GET['tick_enabled'] = bytes(not self.request.GET['tick_enabled'])
+    #     # vcc.toggle_tick(enabled=not self.request.POST['tick_enabled'])
+    #     # vcc.save()
+    #     # logger.debug(f"ClockControlView.post(): tick_enabled: ")
     #     return super().post(request, *args, **kwargs)
-
-    # def get_context_data(self, **kwargs):
-    #     context = super().get_context_data(**kwargs)
-    #     context['is_ticking'] = getattr(self.request.user, "virtual_clocks", None)
-

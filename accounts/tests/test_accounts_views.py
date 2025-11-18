@@ -189,3 +189,22 @@ class ClockDeleteViewTest(TestCase):
         # self.assertEqual(response.status_code, 404)  # або 403 — залежно від твоєї реалізації
 
 
+class ClockControlViewTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="emily", password="verySecret123!")
+        self.clock = VirtualClock.objects.create(user_owner=self.user)
+        self.client.login(username="emily", password="verySecret123!")
+        self.url = reverse("clock_control", args=[self.clock.id])
+
+    def test_control_view_requires_login(self):
+        self.client.logout()
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("login", response.url)
+
+    def test_control_view_post_toggles_clock(self):
+        old_state = self.clock.tick_enabled
+        response = self.client.post(self.url)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(VirtualClock.objects.count(), 1)
+        self.assertNotEqual(VirtualClock.objects.first().tick_enabled, not old_state)

@@ -1,10 +1,16 @@
 {% extends "accounts/profile_base.html" %}
 {% block title %}{{ clock.name }} – {{ ENV_SITE_NAME }}{% endblock %}
+{% load tz %}
 
 {% block profile_content %}
 <h2>{{ clock.name }}</h2>
 <p><strong>API токен:</strong> <code>{{ clock.api_token }}</code></p>
 <p><strong>Активність:</strong> {{ clock.tick_enabled|yesno:"увімкнений,вимкнений" }}</p>
+<p><strong>Поточний час:</strong>
+{% localtime on %}
+{{ current_time }}
+{% endlocaltime %}
+</p>
 
 <hr>
 <a href="{% url 'profile_clocks' %}" class="btn btn-secondary mt-3">← Назад</a>
