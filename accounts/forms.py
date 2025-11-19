@@ -9,7 +9,7 @@ User = get_user_model()
 class TimeShiftUserCreationForm(UserCreationForm):
     class Meta:
         model = User
-        fields = ('username', 'email')
+        fields = ('username', 'email', 'phone_number')
 
 User = get_user_model()
 

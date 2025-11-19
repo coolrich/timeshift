@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     'webapp.apps.PagesConfig',
     'accounts',
     'core',
+    'phonenumber_field',
 ]
 
 MIDDLEWARE = [

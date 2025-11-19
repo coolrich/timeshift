@@ -1,6 +1,7 @@
 import secrets
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from phonenumber_field.modelfields import PhoneNumberField
 
 def generate_api_token(model, field_name="api_token", length=32):
     """Генерує унікальний токен, перевіряючи відсутність колізій у базі."""
@@ -17,6 +18,7 @@ class TimeShiftUser(AbstractUser):
         unique=True,
     )
     full_name = models.CharField(max_length=255, blank=True)
+    phone_number = PhoneNumberField(blank=False, null=False)
     max_clocks_count = models.PositiveIntegerField(default=3)
 
     def save(self, *args, **kwargs):
