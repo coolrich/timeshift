@@ -32,6 +32,13 @@ class VirtualClock(models.Model):
         if self.pk and self.allowed_users.filter(pk=self.user_owner.pk).exists():
             raise IntegrityError("Owner cannot be in allowed_users.")
 
+        if self.user_owner.virtual_clocks.count() >= self.user_owner.max_clocks_count:
+            for clock in self.user_owner.virtual_clocks.order_by("-created_at").all():
+                if self.user_owner.virtual_clocks.count() <= self.user_owner.max_clocks_count:
+                    break
+                clock.delete()
+            raise IntegrityError("User has reached the maximum number of clocks.")
+
         if not self.api_token:
             while True:
                 token = secrets.token_urlsafe(32)

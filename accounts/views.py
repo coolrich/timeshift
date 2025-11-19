@@ -1,5 +1,7 @@
+from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db import IntegrityError
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy
 from django.views import View
@@ -110,7 +112,12 @@ class ClockCreateView(LoginRequiredMixin, CreateView):
         # додаємо власника
         form.instance.user_owner = self.request.user
         logger.debug(f"Creating clock for user {self.request.user} with name {form.cleaned_data['name']}")
-        return super().form_valid(form)
+        try:
+            return super().form_valid(form)
+        except IntegrityError as e:
+            logger.error(f"ClockCreateView.form_valid(): IntegrityError: {e}")
+            messages.error(self.request, "Не вдалося створити годинник. Перевищено ліміт годинників.")
+            return redirect("profile_clocks")
 
 class ClockDeleteView(LoginRequiredMixin, DeleteView):
     model = VirtualClock

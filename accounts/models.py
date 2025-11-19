@@ -17,6 +17,7 @@ class TimeShiftUser(AbstractUser):
         unique=True,
     )
     full_name = models.CharField(max_length=255, blank=True)
+    max_clocks_count = models.PositiveIntegerField(default=3)
 
     def save(self, *args, **kwargs):
         if not self.api_token:
