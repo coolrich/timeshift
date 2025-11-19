@@ -1,7 +1,10 @@
 from django.contrib.auth import login
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy
+from django.views import View
 from django.views.generic import CreateView, TemplateView, ListView, UpdateView, DetailView, DeleteView, FormView
+from django.views.generic.edit import FormMixin
 
 from core.models import VirtualClock
 from core.services import VirtualClockController
@@ -133,15 +136,24 @@ class ProfileSettingsView(LoginRequiredMixin, UpdateView):
         # можна додати повідомлення: messages.success(self.request, "Налаштування збережено.")
         return response
 
-class ClockControlView(LoginRequiredMixin, UpdateView):
-    model = VirtualClock
-    template_name = "accounts/clocks.html"
-    fields = ["tick_enabled"]
+
+class ClockControlView(LoginRequiredMixin, View):
     success_url = reverse_lazy("profile_clocks")
 
     def get_queryset(self):
         # дозволяємо контролювати лише свої годинники
         return self.request.user.virtual_clocks.all()
+
+    def post(self, request, *args, **kwargs):
+        pk = kwargs.get("pk")
+        clock = get_object_or_404(self.get_queryset(), pk=pk)
+
+        controller = VirtualClockController(clock)
+        controller.toggle_tick()
+        controller.save()
+
+        return redirect(self.success_url)
+
 
     # def get(self, request, *args, **kwargs):
     #     # vc = self.request.user.virtual_clocks.get(id=self.kwargs["pk"])

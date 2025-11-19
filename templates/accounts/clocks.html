@@ -25,16 +25,15 @@
         {{ clock.tick_enabled|yesno:"активний,вимкнений" }}
       </span>
       <form method="post" action="{% url 'clock_control' clock.id %}">
-          {% csrf_token %}
-          <input type="hidden" name="tick_enabled" value={% if not clock.tick_enabled %}True{% else %}False{% endif %}>
-          <button type="submit" class="btn btn-sm btn-outline-primary">
-          {% if not clock.tick_enabled %}
-              ▶
-          {% else %}
-              ⏸
-          {% endif %}
-          </button>︎
-      </form>
+        {% csrf_token %}
+        <button type="submit" class="btn btn-sm btn-outline-primary">
+        {% if clock.tick_enabled %}
+            ⏸
+        {% else %}
+            ▶
+        {% endif %}
+        </button>
+    </form>
       <a href="{% url 'clock_delete' clock.id %}" class="btn btn-sm btn-outline-danger">🗑️</a>
     </div>
   </div>
