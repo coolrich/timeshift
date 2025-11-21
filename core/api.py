@@ -3,7 +3,7 @@ from typing import Optional, List
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.http import Http404, HttpResponse
+from django.http import HttpResponse
 from ninja import NinjaAPI
 from ninja import Router
 from ninja.errors import HttpError
@@ -12,7 +12,7 @@ from ninja.responses import Response
 from core.auth import SessionOrToken
 from core.models import VirtualClock
 from .schemas import TimeData, VirtualClockInfo, ClockUpdateRequest, \
-    CreateClockRequest, TimeDataUpdate, ErrorClockResponse, UserDataResponse
+    CreateClockRequest, TimeDataUpdate, ErrorClockResponse, UserDataResponse, BaseClockRequest, TimeResponse
 from .services import VirtualClockController
 from .utils import TimeService
 
@@ -23,7 +23,7 @@ router = Router()
 api.add_router("/time", router)
 
 # TODO: review the method
-def get_v_clock_controller(request, clock_id: Optional[str] = None) -> tuple[VirtualClockController, User]:
+def get_v_clock_controller(request, clock_id: int) -> tuple[VirtualClockController, User]:
     user = request.auth
     if clock_id:
         try:
@@ -45,14 +45,16 @@ def get_v_clock_controller(request, clock_id: Optional[str] = None) -> tuple[Vir
             logger.info(f"Allowed user {user} requested clock {clock_id} of user owner {clock.user_owner}")
     else:
         # TODO: review this logic
-        clock = VirtualClock.objects.filter(user_owner=user).first()
-        if not clock:
-            logger.info(f"No clocks found for user {user}, creating a default one")
-            clock = VirtualClock.objects.create(user=user, name="Default Clock")
+        # clock = VirtualClock.objects.filter(user_owner=user).first()
+        # if not clock:
+        #     logger.info(f"No clocks found for user {user}, creating a default one")
+        #     clock = VirtualClock.objects.create(user=user, name="Default Clock")
+        raise HttpError(status_code=404, message="Not found")
     return VirtualClockController(clock), user
 
 
-@router.get("/testuser", response=UserDataResponse)
+@router.get("/testuser/", response=UserDataResponse,
+            description='Check if api is working')
 def test(request):
     user = request.auth
     return UserDataResponse(
@@ -119,9 +121,16 @@ def test(request):
 
 
 
-# TODO: review this method
-@router.post("/setreal/", response={200:TimeData, 403:ErrorClockResponse})
-def set_real(request, clock_id: Optional[str] = None):
+# TODO: review this method: fix the request schema
+@router.post("/setreal/", response={200:TimeResponse, 403:ErrorClockResponse})
+def set_real(request, payload: BaseClockRequest):
+    """
+    Set the time of the clock to the current real time.
+
+    Parameters:
+       - **clock_id** (int): The clock ID (required)
+    """
+    clock_id = payload.clock_id
     controller, user = get_v_clock_controller(request, clock_id)
     controller.set_real_time()
     controller.save()
@@ -144,6 +153,12 @@ def set_real(request, clock_id: Optional[str] = None):
 
 @router.post("/clocks/", response={201:VirtualClockInfo, 403:ErrorClockResponse})
 def create_clock(request, payload: Optional[CreateClockRequest] = None):
+    """
+    Create a new clock.
+
+    Parameters:
+       - name (str): The clock name
+    """
     logger.debug(f"create_clock() request: {request}")
     user = request.auth
     logger.debug(f"create_clock() user: {user} | name: {payload.name if payload else None}")
@@ -153,7 +168,7 @@ def create_clock(request, payload: Optional[CreateClockRequest] = None):
         # f"Clock {VirtualClock.objects.filter(user_owner=user).count() + 1}"
     )
     return Response(data=VirtualClockInfo(
-        id=str(clock.id),
+        id=clock.id,
         name=clock.name,
         tick_enabled=clock.tick_enabled,
         current_time=clock.current_time.isoformat()
@@ -162,7 +177,13 @@ def create_clock(request, payload: Optional[CreateClockRequest] = None):
 
 # 🟢 RETRIEVE (отримати один годинник)
 @router.get("/clocks/{clock_id}/", response={200:TimeData, 403:ErrorClockResponse})
-def retrieve_clock(request, clock_id: str):
+def retrieve_clock(request, clock_id: int):
+    """
+    Retrieve a clock.
+
+    Parameters:
+       - **clock_id**: The clock ID (required)
+    """
     controller, user = get_v_clock_controller(request, clock_id)
 
     return TimeData(
@@ -177,6 +198,9 @@ def retrieve_clock(request, clock_id: str):
 # 🟢 LIST (отримати всі годинники)
 @router.get("/clocks/", response={200:List[TimeData], 403:ErrorClockResponse})
 def list_clocks(request):
+    """
+    List all clocks.
+    """
     user = request.auth
     clocks = []
 
@@ -211,6 +235,18 @@ def list_clocks(request):
 
 @router.put("/clocks/", response={200:TimeDataUpdate, 403:ErrorClockResponse})
 def update_clock(request, payload: ClockUpdateRequest):
+    """
+    Update a clock.
+
+    Parameters:
+       - **clock_id** : The clock ID (required)
+       -  name : The clock name
+       -  time : The clock time
+       -  tick_enabled : The clock tick status
+       -  allowed_users : The clock allowed users
+       -  add_users : The clock add users
+       -  remove_users : The clock remove users
+    """
     payload_dict = payload.dict()
     logger.debug(f"core.api.update_clock(): payload_dict: {payload_dict}")
     clock_id = payload_dict["id"]
@@ -253,7 +289,7 @@ def update_clock(request, payload: ClockUpdateRequest):
     logger.info(f"core.api.update_clock(): changed_fields: {changed_fields}")
     controller.save()
     return TimeDataUpdate(
-        id=clock.id,
+        clock_id=clock.id,
         name=clock.name if "name" in changed_fields else None,
         time=controller.get_time() if "time" in changed_fields else None,
         tick_enabled=controller.tick_status if "tick_enabled" in changed_fields else None,
@@ -268,7 +304,13 @@ def update_clock(request, payload: ClockUpdateRequest):
     "/clocks/{clock_id}",
     response={204: None, 404: ErrorClockResponse, 403: ErrorClockResponse},
 )
-def delete_clock(request, clock_id: str):
+def delete_clock(request, clock_id: int):
+    """
+    Delete a clock.
+
+    Parameters:
+       - **clock_id**: The clock ID (required)
+    """
     controller, user = get_v_clock_controller(request, clock_id)
     controller.virtual_clock.delete()
     return HttpResponse(status=204)

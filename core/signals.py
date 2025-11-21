@@ -1,3 +1,4 @@
+from django.db import IntegrityError
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.contrib.auth import get_user_model
@@ -13,8 +14,9 @@ User = get_user_model()
 #         new_public_id = VirtualClock.objects.all().order_by("-public_id").first().public_id + 1
 #         VirtualClock.objects.create(user_owner=instance, public_id=new_public_id)
 
+# Сигнал для відлову .add() в allowed_users
 @receiver(m2m_changed, sender=VirtualClock.allowed_users.through)
 def prevent_owner_in_allowed(sender, instance, action, pk_set, **kwargs):
     if action == "pre_add":
         if instance.user_owner_id in pk_set:
-            raise ValidationError("Owner cannot be added to allowed_users.")
+            raise IntegrityError("Owner cannot be added to allowed_users.")

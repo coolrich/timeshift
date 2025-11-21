@@ -32,7 +32,7 @@ class VirtualClock(models.Model):
         if self.pk and self.allowed_users.filter(pk=self.user_owner.pk).exists():
             raise IntegrityError("Owner cannot be in allowed_users.")
 
-        if self.user_owner.virtual_clocks.count() >= self.user_owner.max_clocks_count:
+        if self.user_owner.virtual_clocks.count() > self.user_owner.max_clocks_count:
             for clock in self.user_owner.virtual_clocks.order_by("-created_at").all():
                 if self.user_owner.virtual_clocks.count() <= self.user_owner.max_clocks_count:
                     break
@@ -65,11 +65,3 @@ class VirtualClock(models.Model):
 
     def __str__(self):
         return f"VirtualClock '{self.name}' of {self.user_owner.username} with id: {self.id}"
-
-
-# Сигнал для відлову .add() в allowed_users
-@receiver(m2m_changed, sender=VirtualClock.allowed_users.through)
-def prevent_owner_in_allowed(sender, instance, action, pk_set, **kwargs):
-    if action == "pre_add":
-        if instance.user_owner_id in pk_set:
-            raise IntegrityError("Owner cannot be added to allowed_users.")

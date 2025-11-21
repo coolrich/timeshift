@@ -6,6 +6,9 @@ from typing import Optional, List
 # Запити
 # ======================
 
+class BaseClockRequest(Schema):
+    clock_id: int
+
 class TimeRequest(Schema):
     time: str  # ISO 8601, наприклад: "2025-08-22T10:15:00+00:00"
 
@@ -27,10 +30,9 @@ class BaseClockSchema(Schema):
 # Схема для відповіді (всі поля обов'язкові)
 class TimeData(BaseClockSchema):
     user_owner_id: int
-    pass
 
 class TimeDataUpdate(Schema):
-    id: Optional[int] = None
+    clock_id: Optional[int] = None
     name: Optional[str] = None
     time: Optional[str] = None
     tick_enabled: Optional[bool] = None
@@ -39,7 +41,7 @@ class TimeDataUpdate(Schema):
 
 # Схема для PUT-запиту (поля необов'язкові)
 class ClockUpdateRequest(Schema):
-    id: int
+    clock_id: int
     name: Optional[str] = None
     time: Optional[str] = None
     tick_enabled: Optional[bool] = None
