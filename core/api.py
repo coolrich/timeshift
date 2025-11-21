@@ -121,7 +121,7 @@ def test(request):
 
 
 
-# TODO: review this method: fix the request schema
+
 @router.post("/setreal/", response={200:TimeResponse, 403:ErrorClockResponse})
 def set_real(request, payload: BaseClockRequest):
     """
