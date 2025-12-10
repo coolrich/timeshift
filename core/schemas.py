@@ -44,10 +44,19 @@ class ClockUpdateRequest(Schema):
     clock_id: int
     name: Optional[str] = None
     time: Optional[str] = None
-    tick_enabled: Optional[bool] = None
+    tick_enabled: Optional[bool] = False
     allowed_users: Optional[List[int]] = None   # повна заміна
     add_users: Optional[List[int]] = None       # додати
     remove_users: Optional[List[int]] = None    # видалити
+    # add datetime validation
+
+    # def validate_time(self):
+    #     if self.time:
+    #         try:
+    #             datetime.fromisoformat(self.time)
+    #         except ValueError:
+    #             raise ValueError("Invalid time format")
+
 
 class TickStatusResponse(Schema):
     status: str

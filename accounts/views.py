@@ -1,16 +1,22 @@
+import datetime
+from datetime import timezone
+
+import pytz
+from django.utils import timezone as dj_tz
 from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import IntegrityError
 from django.shortcuts import get_object_or_404, redirect
-from django.urls import reverse_lazy
+from django.template.context_processors import request
+from django.urls import reverse_lazy, reverse
 from django.views import View
 from django.views.generic import CreateView, TemplateView, ListView, UpdateView, DetailView, DeleteView, FormView
-from django.views.generic.edit import FormMixin
+from django.views.generic.edit import FormMixin, ModelFormMixin
 
 from core.models import VirtualClock
 from core.services import VirtualClockController
-from .forms import TimeShiftUserCreationForm, UserSettingsForm
+from .forms import TimeShiftUserCreationForm, UserSettingsForm, VirtualClockForm
 from django.contrib.auth import get_user_model
 from logging import getLogger
 
@@ -84,10 +90,12 @@ class ProfileClocksView(LoginRequiredMixin, ListView):
     #     context["form"] = self.form_class()
     #     return context
 
-class ClockDetailView(LoginRequiredMixin, DetailView):
+class ClockDetailView(LoginRequiredMixin, DetailView, ModelFormMixin):
     model = VirtualClock
     template_name = "accounts/clock_detail.html"
     context_object_name = "clock"
+    # fields = ["current_time"]
+    form_class = VirtualClockForm
 
     def get_queryset(self):
         # тільки годинники користувача
@@ -98,7 +106,9 @@ class ClockDetailView(LoginRequiredMixin, DetailView):
         # vcc = VirtualClockController(self.request.user.virtual_clocks.get(id=self.kwargs["pk"]))
         vcc = VirtualClockController(self.object)
         context["current_time"] = vcc.get_time()
-        logger.debug(f"Current time: {vcc.get_time()}")
+        user_tz = self.request.user.timezone
+        dj_tz.activate(user_tz)
+        logger.debug(f"Current time: {vcc.get_iso_time()}")
         return context
 
 
@@ -144,8 +154,8 @@ class ProfileSettingsView(LoginRequiredMixin, UpdateView):
         return response
 
 
-class ClockControlView(LoginRequiredMixin, View):
-    success_url = reverse_lazy("profile_clocks")
+class ClockStateControlView(LoginRequiredMixin, View):
+    # success_url = reverse_lazy("profile_clocks")
 
     def get_queryset(self):
         # дозволяємо контролювати лише свої годинники
@@ -158,16 +168,43 @@ class ClockControlView(LoginRequiredMixin, View):
         controller = VirtualClockController(clock)
         controller.toggle_tick()
         controller.save()
+        # logger.error(f"ClockCreateView.form_valid(): TypeError: {e}")
+        # messages.error(self.request, "Не вдалося встановити час. Перевірте правильність формату ISO 8601")
+        # logger.debug(f"ClockStateControlView.post(): clock_id={kwargs['pk']}")
+        referrer = request.META.get("HTTP_REFERER")
+        if referrer:
+            return redirect(referrer) #, kwargs={"pk": kwargs['pk']})
+        else:
+            return redirect(reverse('profile_clocks'))
 
-        return redirect(self.success_url)
 
 
-    # def get(self, request, *args, **kwargs):
-    #     # vc = self.request.user.virtual_clocks.get(id=self.kwargs["pk"])
-    #     # vcc = VirtualClockController(vc)
-    #     logger.debug(f"ClockControlView.post(): request.POST: {self.request.GET}")
-    #     self.request.GET['tick_enabled'] = bytes(not self.request.GET['tick_enabled'])
-    #     # vcc.toggle_tick(enabled=not self.request.POST['tick_enabled'])
-    #     # vcc.save()
-    #     # logger.debug(f"ClockControlView.post(): tick_enabled: ")
-    #     return super().post(request, *args, **kwargs)
+
+class ClockTimeControlView(LoginRequiredMixin, View):
+    success_url = reverse_lazy("profile_clocks")
+
+    def get_queryset(self):
+        # дозволяємо контролювати лише свої годинники
+        return self.request.user.virtual_clocks.all()
+
+    def post(self, request, *args, **kwargs):
+        pk = kwargs.get("pk")
+        clock = get_object_or_404(self.get_queryset(), pk=pk)
+        controller = VirtualClockController(clock)
+        logger.debug(f"ClockStateControlView.post(): current_time={request.POST['current_time']}")
+        try:
+            tz = pytz.timezone(self.request.user.timezone)
+            dt_naive = datetime.datetime.strptime(
+                request.POST['current_time'],
+                "%d.%m.%Y %H:%M:%S"
+            )
+            # Робимо tz-aware дату
+            dt_user = tz.localize(dt_naive)
+            dt_iso = dt_user.isoformat()
+        except (ValueError, pytz.UnknownTimeZoneError) as e:
+            logger.error(f"ClockTimeControlView.post(): ValueError: {e}")
+            messages.error(self.request, "Не вдалося встановити час. Перевірте правильність формату ISO 8601")
+            return redirect(reverse('clock_detail', kwargs={"pk": kwargs['pk']}))
+        controller.set_time(dt_iso)
+        controller.save()
+        return redirect(reverse('clock_detail', kwargs={"pk": kwargs['pk']}))

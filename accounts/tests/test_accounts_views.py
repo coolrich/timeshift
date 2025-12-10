@@ -1,12 +1,10 @@
-from http.client import responses
-from importlib.metadata import requires
+from logging import getLogger
 
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
-from django.contrib.auth import get_user_model
 
 from core.models import VirtualClock
-from logging import getLogger
 
 logger = getLogger(__name__)
 User = get_user_model()
@@ -26,8 +24,11 @@ class SignUpViewTests(TestCase):
             "username": "newuser",
             "password1": "StrongPass123!",
             "password2": "StrongPass123!",
+            "email": "newuser@example.com",
+            "phone_number": "+380687807356"
         }
         response = self.client.post(url, data)
+        logger.debug(f"Response: {response.content.decode()}")
         # перевіряємо, що редірект на profile
         self.assertRedirects(response, reverse("profile_dashboard"))
         # користувач створений
@@ -189,7 +190,7 @@ class ClockDeleteViewTest(TestCase):
         # self.assertEqual(response.status_code, 404)  # або 403 — залежно від твоєї реалізації
 
 
-class ClockControlViewTest(TestCase):
+class ClockStateControlViewTest(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="emily", password="verySecret123!")
         self.clock = VirtualClock.objects.create(user_owner=self.user)
@@ -204,7 +205,32 @@ class ClockControlViewTest(TestCase):
 
     def test_control_view_post_toggles_clock(self):
         old_state = self.clock.tick_enabled
-        response = self.client.post(self.url)
-        self.assertEqual(response.status_code, 302)
+        response = self.client.post(self.url, follow=True)
+        self.assertEqual(response.status_code, 200)
         self.assertEqual(VirtualClock.objects.count(), 1)
-        self.assertNotEqual(VirtualClock.objects.first().tick_enabled, not old_state)
+        self.assertNotEqual(VirtualClock.objects.first().tick_enabled, old_state)
+
+class ClockTimeControlViewTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="emily", password="verySecret123!")
+        self.clock = VirtualClock.objects.create(user_owner=self.user)
+        self.client.login(username="emily", password="verySecret123!")
+        self.url = reverse("clock_edit_time", args=[self.clock.id])
+
+    def test_view_edits_time(self):
+        now = '01.01.2025 12:00:00'
+        # logger.debug(f"Current time: {now}")
+        response = self.client.post(self.url, {"current_time": now}, follow=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "accounts/clock_detail.html")
+        # self.assertRedirects(response, reverse("clock_detail", args=[self.clock.id]))
+        self.assertContains(response, now)
+
+    def test_view_edits_time_with_invalid_time(self):
+        now = 'invalid_time'
+        response = self.client.post(self.url, {"current_time": now}, follow=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "accounts/clock_detail.html")
+        # logger.debug(f"Response: {response.content}")
+        self.assertRedirects(response, reverse("clock_detail", args=[self.clock.id]))
+        self.assertContains(response, "Не вдалося встановити час. Перевірте правильність формату ISO 8601")

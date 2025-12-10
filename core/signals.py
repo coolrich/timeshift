@@ -1,3 +1,5 @@
+import datetime
+
 from django.db import IntegrityError
 from django.db.models.signals import post_save
 from django.dispatch import receiver
@@ -20,3 +22,10 @@ def prevent_owner_in_allowed(sender, instance, action, pk_set, **kwargs):
     if action == "pre_add":
         if instance.user_owner_id in pk_set:
             raise IntegrityError("Owner cannot be added to allowed_users.")
+
+# @receiver(post_save, sender=VirtualClock)
+# def prevent_current_time_wrong_format(sender, instance, **kwargs):
+#     try:
+#         datetime.datetime.fromisoformat(instance.current_time)
+#     except ValueError:
+#         raise IntegrityError("Current time must be in ISO format.")

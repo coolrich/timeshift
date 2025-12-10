@@ -1,4 +1,6 @@
 import secrets
+
+import pytz
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from phonenumber_field.modelfields import PhoneNumberField
@@ -16,6 +18,12 @@ class TimeShiftUser(AbstractUser):
         default="",  # тимчасово пусте, ми заповнимо нижче
         editable=False,
         unique=True,
+    )
+    timezone = models.CharField(
+        max_length=50,
+        choices=[(tz, tz) for tz in pytz.common_timezones],
+        default="UTC",
+        help_text="Часова зона користувача, наприклад Europe/Kyiv"
     )
     full_name = models.CharField(max_length=255, blank=True)
     phone_number = PhoneNumberField(blank=False, null=False)

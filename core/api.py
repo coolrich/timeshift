@@ -140,7 +140,7 @@ def set_real(request, payload: BaseClockRequest):
             clock_id=controller.virtual_clock.id,
             user_owner_id=controller.get_user_owner().id,
             name=controller.virtual_clock.name,
-            time=controller.get_time(),
+            time=controller.get_iso_time(),
             tick_enabled=controller.tick_status
         ),
         "message": "Time set to real time"
@@ -190,7 +190,7 @@ def retrieve_clock(request, clock_id: int):
         clock_id=controller.virtual_clock.id,
         user_owner_id=controller.get_user_owner().id,
         name=controller.virtual_clock.name,
-        time=controller.get_time(),
+        time=controller.get_iso_time(),
         allowed_users=list(controller.virtual_clock.allowed_users.values_list("id", flat=True)),
         tick_enabled=controller.tick_status
     )
@@ -217,7 +217,7 @@ def list_clocks(request):
                 clock_id=clock.id,
                 user_owner_id=owner.id,
                 name=clock.name,
-                time=controller.get_time(),
+                time=controller.get_iso_time(),
                 allowed_users=allowed_users,
                 tick_enabled=controller.tick_status,
             ))
@@ -226,7 +226,7 @@ def list_clocks(request):
                 clock_id=clock.id,
                 user_owner_id=owner.id,
                 name=clock.name,
-                time=controller.get_time(),
+                time=controller.get_iso_time(),
                 tick_enabled=controller.tick_status,
             ))
 
@@ -249,7 +249,7 @@ def update_clock(request, payload: ClockUpdateRequest):
     """
     payload_dict = payload.dict()
     logger.debug(f"core.api.update_clock(): payload_dict: {payload_dict}")
-    clock_id = payload_dict["id"]
+    clock_id = payload_dict["clock_id"]
     controller, user = get_v_clock_controller(request, clock_id)
     clock = controller.virtual_clock
     changed_fields = []
@@ -291,7 +291,7 @@ def update_clock(request, payload: ClockUpdateRequest):
     return TimeDataUpdate(
         clock_id=clock.id,
         name=clock.name if "name" in changed_fields else None,
-        time=controller.get_time() if "time" in changed_fields else None,
+        time=controller.get_iso_time() if "time" in changed_fields else None,
         tick_enabled=controller.tick_status if "tick_enabled" in changed_fields else None,
         allowed_users=list(clock.allowed_users.values_list("id", flat=True)) if "allowed_users" in changed_fields else None,
         changed_fields=changed_fields

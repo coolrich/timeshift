@@ -43,7 +43,7 @@ class VirtualClockController:
             return self.virtual_clock.current_time + delta
         return self.virtual_clock.current_time
 
-    def get_time(self) -> str:
+    def get_iso_time(self) -> str:
         """
         Get the current virtual time in ISO format.
         
@@ -52,6 +52,16 @@ class VirtualClockController:
             The time is calculated based on the current state of the clock.
         """
         return self._current_time().isoformat()
+
+    def get_time(self) -> datetime:
+        """
+        Get the current virtual time.
+
+        Returns:
+            datetime: The current virtual UTC time as a datetime object.
+            The time is calculated based on the current state of the clock.
+        """
+        return self._current_time()
 
     def get_user_owner(self) -> User:
         """

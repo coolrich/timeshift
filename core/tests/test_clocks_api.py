@@ -13,7 +13,10 @@ client = TestClient(router)
 class ClockTests(TestCase):
 
     def setUp(self):
-        self.user = User.objects.create_user(username="emily")
+        self.user = User.objects.create_user(username="emily",
+                                             password="emilypass",
+                                             email="emily@example.com",
+                                             phone_number="+380969817231")
 
     def test_create_clock_with_payload(self):
         payload = {"name": "MyClock"}
@@ -84,7 +87,7 @@ class ClockTests(TestCase):
         user = self.user
         clock = VirtualClock.objects.create(user_owner=user, name="Old Name", tick_enabled=False)
         payload = {
-            "id": clock.id,
+            "clock_id": clock.id,
             "name": "New Name",
             "tick_enabled": True,
         }
@@ -101,10 +104,15 @@ class ClockTests(TestCase):
 
     def test_update_clock_denied_for_non_owner(self):
         owner = self.user
-        stranger = User.objects.create_user(username="nick")
+        stranger = User.objects.create_user(username="nick",
+                                            password="nickpass",
+                                            email="nick@example.com",
+                                            phone_number="+380969817231"
+                                            )
         clock = VirtualClock.objects.create(user_owner=owner, name="Clock1")
 
-        payload = {"id": clock.id, "allowed_users": [str(stranger.id)]}
+        payload = {"clock_id": clock.id,
+                   "allowed_users": [str(stranger.id)]}
         response = client.put("/clocks/", json=payload,
                               headers={"Authorization": f"Bearer {str(stranger.api_token)}"})
 

@@ -25,7 +25,7 @@ class TestVirtualClockController(TestCase):
         Перевіряємо, що get_time() повертає точний UTC час
         та його локальну конвертацію можна отримати в Києві.
         """
-        time_iso = self.controller.get_time()
+        time_iso = self.controller.get_iso_time()
         time_utc = datetime.fromisoformat(time_iso)  # aware datetime у UTC
         self.assertEqual(time_utc, dj_timezone.now())
 
@@ -47,7 +47,7 @@ class TestVirtualClockController(TestCase):
         manual_time = datetime(2025, 10, 31, 16, 15, 30, tzinfo=timezone.utc)
         self.controller.set_time(manual_time)
 
-        time_iso = self.controller.get_time()
+        time_iso = self.controller.get_iso_time()
         time_dt = datetime.fromisoformat(time_iso)
         self.assertEqual(time_dt, manual_time)
 
@@ -57,7 +57,7 @@ class TestVirtualClockController(TestCase):
         та вимикає tick.
         """
         updated_clock = self.controller.set_real_time()
-        time_dt = datetime.fromisoformat(self.controller.get_time())
+        time_dt = datetime.fromisoformat(self.controller.get_iso_time())
         expected_time = dj_timezone.now()
 
         # Перевірка часу

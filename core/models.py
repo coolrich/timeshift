@@ -22,8 +22,8 @@ class VirtualClock(models.Model):
     )
 
     current_time = models.DateTimeField(default=timezone.now)
-    tick_enabled = models.BooleanField(default=False)
     last_updated = models.DateTimeField(default=timezone.now)
+    tick_enabled = models.BooleanField(default=False)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
