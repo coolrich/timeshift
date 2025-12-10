@@ -4,8 +4,8 @@
 
 {% block profile_content %}
 <h2>{{ clock.name }}</h2>
-<p><strong>API токен:</strong> <code>{{ clock.api_token }}</code></p>
 <p><strong>Активність:</strong> {{ clock.tick_enabled|yesno:"увімкнений,вимкнений" }}</p>
+<p><strong>ID:</strong> {{ clock.id }}</p>
 <form method="post" action="{% url 'clock_control' clock.id %}">
         {% csrf_token %}
         <button type="submit" class="btn btn-sm btn-outline-primary">
