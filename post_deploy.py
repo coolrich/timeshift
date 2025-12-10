@@ -16,13 +16,14 @@ def run():
             print(f"Migrations skipped or failed: {e}")
 
         User = get_user_model()
+        call_command('flush', interactive=False)
         if not User.objects.filter(username=os.environ.get('USERNAME', 'admin')).exists():
             User.objects.create_superuser(
                 username=os.environ.get('USERNAME', 'admin'),
                 email=os.environ.get('EMAIL', 'admin@example.com'),
                 password=os.environ.get('PASSWORD', 'adminpassword')
             )
-            print("Superuser created.")
+        print("Superuser created.")
     # call_command('collectstatic', '--noinput')
     print("Post-deploy script finished")
 
