@@ -18,7 +18,7 @@ User = get_user_model()
 class UserSettingsForm(forms.ModelForm):
     class Meta:
         model = User
-        fields = ["username", "email", "timezone", 'phone_number']  # можеш розширити
+        fields = ["username", "email", "timezone", 'phone_number']
         widgets = {
             "username": forms.TextInput(attrs={"class": "form-control"}),
             "email": forms.EmailInput(attrs={"class": "form-control"}),

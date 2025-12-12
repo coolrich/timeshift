@@ -150,7 +150,7 @@ class ProfileSettingsView(LoginRequiredMixin, UpdateView):
 
     def form_valid(self, form):
         response = super().form_valid(form)
-        # можна додати повідомлення: messages.success(self.request, "Налаштування збережено.")
+        messages.success(self.request, "Налаштування збережено.")
         return response
 
 

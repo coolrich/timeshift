@@ -1,5 +1,6 @@
 from logging import getLogger
 
+from Demos.win32ts_logoff_disconnected import username
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
@@ -188,6 +189,50 @@ class ClockDeleteViewTest(TestCase):
         response = self.client.post(self.url)
         logger.debug(f"Response: {response}")
         # self.assertEqual(response.status_code, 404)  # або 403 — залежно від твоєї реалізації
+
+
+class ProfileSettingsViewTest(TestCase):
+    def setUp(self):
+        self.un = "emily"
+        self.ps = "verySecret123!"
+        self.tz = "Europe/Kyiv"
+        self.em = "emily@example.com"
+        self.pn = "+380969817231"
+        self.user = User.objects.create_user(username=self.un, password=self.ps, timezone=self.tz, email=self.em, phone_number=self.pn)
+        self.client.login(username=self.un, password=self.ps)
+        self.url = reverse("profile_settings")
+
+    def test_profile_settings_context(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "accounts/settings.html")
+        self.assertIn("user", response.context)
+
+    def test_profile_settings_message(self):
+        logger.debug(f"test_profile_notifications()")
+        # response = self.client.get(self.url)
+        r = self.client.post(self.url, {
+            'username': self.un,
+            'timezone': self.tz,
+            'email': self.em,
+            'phone_number': self.pn
+        }, follow=True)
+        # logger.debug(f"Response: {response.content.decode()}")
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "Налаштування збережено.")
+
+    def test_post_without_required_fields(self):
+        logger.debug(f"test_required_fields()")
+        r = self.client.post(self.url)
+        # logger.debug(f"Response r.context.get('form').errors: {help(r.context.get('form').errors)}")
+        # logger.debug(f"Response: {r.context.get('form').errors.get_json_data()}")
+        field_details = r.context.get('form').errors.get_json_data().items()
+        form = r.context.get('form')
+        for field_name, details in field_details:
+            self.assertFormError(form,
+                                 field_name,
+                                 details[0]['message'])
+
 
 
 class ClockStateControlViewTest(TestCase):
