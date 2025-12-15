@@ -1,24 +1,23 @@
 import datetime
-from datetime import timezone
+from logging import getLogger
 
 import pytz
-from django.utils import timezone as dj_tz
 from django.contrib import messages
+from django.contrib.auth import get_user_model
 from django.contrib.auth import login
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import IntegrityError
 from django.shortcuts import get_object_or_404, redirect
-from django.template.context_processors import request
 from django.urls import reverse_lazy, reverse
+from django.utils import timezone as dj_tz
 from django.views import View
-from django.views.generic import CreateView, TemplateView, ListView, UpdateView, DetailView, DeleteView, FormView
-from django.views.generic.edit import FormMixin, ModelFormMixin
+from django.views.generic import CreateView, TemplateView, ListView, UpdateView, DetailView, DeleteView
+from django.views.generic.edit import ModelFormMixin
 
 from core.models import VirtualClock
 from core.services import VirtualClockController
 from .forms import TimeShiftUserCreationForm, UserSettingsForm, VirtualClockForm
-from django.contrib.auth import get_user_model
-from logging import getLogger
+from .services import UserController
 
 logger = getLogger(__name__)
 
@@ -177,9 +176,6 @@ class ClockStateControlView(LoginRequiredMixin, View):
         else:
             return redirect(reverse('profile_clocks'))
 
-
-
-
 class ClockTimeControlView(LoginRequiredMixin, View):
     success_url = reverse_lazy("profile_clocks")
 
@@ -200,11 +196,12 @@ class ClockTimeControlView(LoginRequiredMixin, View):
             )
             # Робимо tz-aware дату
             dt_user = tz.localize(dt_naive)
-            dt_iso = dt_user.isoformat()
+            # dt_iso = dt_user.isoformat()
         except (ValueError, pytz.UnknownTimeZoneError) as e:
             logger.error(f"ClockTimeControlView.post(): ValueError: {e}")
             messages.error(self.request, "Не вдалося встановити час. Перевірте правильність формату ISO 8601")
             return redirect(reverse('clock_detail', kwargs={"pk": kwargs['pk']}))
-        controller.set_time(dt_iso)
+        controller.set_time(dt_user)
         controller.save()
         return redirect(reverse('clock_detail', kwargs={"pk": kwargs['pk']}))
+

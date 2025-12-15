@@ -3,6 +3,8 @@
 import accounts.models
 from django.db import migrations, models
 
+import accounts.services
+
 
 class Migration(migrations.Migration):
 
@@ -14,6 +16,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='timeshiftuser',
             name='api_token',
-            field=models.CharField(default=accounts.models.generate_api_token, editable=False, max_length=64, unique=True),
+            field=models.CharField(default=accounts.services.generate_api_token, editable=False, max_length=64, unique=True),
         ),
     ]

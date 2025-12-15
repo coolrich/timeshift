@@ -1,3 +1,4 @@
+import datetime
 from logging import getLogger
 
 from Demos.win32ts_logoff_disconnected import username
@@ -270,6 +271,7 @@ class ClockTimeControlViewTest(TestCase):
         self.assertTemplateUsed(response, "accounts/clock_detail.html")
         # self.assertRedirects(response, reverse("clock_detail", args=[self.clock.id]))
         self.assertContains(response, now)
+        self.assertEqual(VirtualClock.objects.first().current_time.strftime("%d.%m.%Y %H:%M:%S"), now)
 
     def test_view_edits_time_with_invalid_time(self):
         now = 'invalid_time'
