@@ -1,18 +1,27 @@
 import secrets
 
 import pytz
+from django.core.validators import MinLengthValidator
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from phonenumber_field.modelfields import PhoneNumberField
 
-def generate_api_token(model, field_name="api_token", length=32):
+
+def generate_api_token(model, field_name="api_token", length=32) -> str:
     """Генерує унікальний токен, перевіряючи відсутність колізій у базі."""
     while True:
         token = secrets.token_hex(length)
         if not model.objects.filter(**{field_name: token}).exists():
             return token
 
+
 class TimeShiftUser(AbstractUser):
+    username = models.CharField(
+        max_length=150,
+        unique=True,
+        validators=[MinLengthValidator(3)]
+    )
+    full_name = models.CharField(max_length=255, blank=True)
     api_token = models.CharField(
         max_length=64,
         default="",  # тимчасово пусте, ми заповнимо нижче
@@ -25,7 +34,6 @@ class TimeShiftUser(AbstractUser):
         default="UTC",
         help_text="Часова зона користувача, наприклад Europe/Kyiv"
     )
-    full_name = models.CharField(max_length=255, blank=True)
     phone_number = PhoneNumberField(blank=False, null=False)
     max_clocks_count = models.PositiveIntegerField(default=3)
 

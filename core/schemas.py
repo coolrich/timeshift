@@ -100,7 +100,3 @@ class DeleteClockResponse(Schema):
 class ErrorClockResponse(Schema):
     status: str
     detail: str | None = None
-
-class UserDataResponse(Schema):
-    id: int
-    username: str

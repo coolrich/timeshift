@@ -64,7 +64,7 @@ class TestVirtualClockController(TestCase):
         self.assertEqual(time_dt, expected_time)
 
         # Перевірка, що tick вимкнено
-        self.assertFalse(updated_clock.tick_enabled)
+        self.assertFalse(updated_clock.tick_status)
 
     def test_toggle_tick(self):
         """
@@ -77,19 +77,19 @@ class TestVirtualClockController(TestCase):
         initial_tick = self.controller.virtual_clock.tick_enabled
 
         # 1️⃣ toggle без аргументів
-        updated_clock = self.controller.toggle_tick()
+        updated_clock = self.controller.toggle_tick().virtual_clock
         self.assertEqual(updated_clock.tick_enabled, not initial_tick)
         self.assertEqual(updated_clock.last_updated, dj_timezone.now())
         self.assertEqual(updated_clock.current_time, self.controller._current_time())
 
         # 2️⃣ явне встановлення tick=True
-        updated_clock = self.controller.toggle_tick(enabled=True)
+        updated_clock = self.controller.toggle_tick(enabled=True).virtual_clock
         self.assertTrue(updated_clock.tick_enabled)
         self.assertEqual(updated_clock.last_updated, dj_timezone.now())
         self.assertEqual(updated_clock.current_time, self.controller._current_time())
 
         # 3️⃣ явне встановлення tick=False
-        updated_clock = self.controller.toggle_tick(enabled=False)
+        updated_clock = self.controller.toggle_tick(enabled=False).virtual_clock
         self.assertFalse(updated_clock.tick_enabled)
         self.assertEqual(updated_clock.last_updated, dj_timezone.now())
         self.assertEqual(updated_clock.current_time, self.controller._current_time())

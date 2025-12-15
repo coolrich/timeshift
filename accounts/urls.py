@@ -1,4 +1,5 @@
 from django.urls import path
+
 from .views import SignUpView, ProfileDashboardView, ProfileSettingsView, ProfileClocksView, \
     ProfileTokensView, ClockDetailView, ClockCreateView, ClockDeleteView, ClockStateControlView, ClockTimeControlView
 from django.contrib.auth import views as auth_views
@@ -17,4 +18,5 @@ urlpatterns = [
     path("clocks/new/", ClockCreateView.as_view(), name="clock_create"),
     path("clocks/<int:pk>/delete/", ClockDeleteView.as_view(), name="clock_delete"),
     path('settings/', ProfileSettingsView.as_view(), name='profile_settings'),
+    # path("api/", "accounts.api.router", name="accounts_api"),
 ]

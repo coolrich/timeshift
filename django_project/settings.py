@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     'accounts',
     'core',
     'phonenumber_field',
+    'ninja',
 ]
 
 MIDDLEWARE = [

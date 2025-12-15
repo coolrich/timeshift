@@ -1,8 +1,7 @@
-from http.client import responses
-
-from django.test import TestCase
 from django.contrib.auth import get_user_model
+from django.test import TestCase
 from ninja.testing import TestClient
+
 from core.api import router
 from core.models import VirtualClock
 
@@ -128,3 +127,21 @@ class ClockTests(TestCase):
 
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json()["detail"], "Not found")
+
+    def test_delete_clock_for_owner(self):
+        user = self.user
+        clock = VirtualClock.objects.create(user_owner=user, name="Clock1")
+        response = client.delete(f"/clocks/{clock.id}/", headers={"Authorization": f"bearer {str(user.api_token)}"})
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(VirtualClock.objects.count(), 0)
+
+    def test_delete_clock_for_non_owner(self):
+        user = User.objects.create_user(username="nick",
+                                  password="nickpass",
+                                  email="nick@example.com",
+                                  phone_number="+380969817231"
+                                  )
+        clock = VirtualClock.objects.create(user_owner=self.user, name="Clock1")
+        response = client.delete(f"/clocks/{clock.id}/", headers={"Authorization": f"bearer {str(user.api_token)}"})
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(VirtualClock.objects.count(), 1)

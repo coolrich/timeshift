@@ -1,5 +1,5 @@
 from datetime import timezone, timedelta, datetime
-from typing import Any
+from typing import Any, Type
 
 from django.contrib.auth import get_user_model
 from django.db.models import QuerySet
@@ -27,7 +27,17 @@ class VirtualClockController:
         Args:
             virtual_clock (VirtualClock): The virtual clock instance to control
         """
-        self.virtual_clock: VirtualClock = virtual_clock
+        self._virtual_clock: VirtualClock = virtual_clock
+
+    @property
+    def virtual_clock(self) -> VirtualClock:
+        """
+        Get the virtual clock instance.
+
+        Returns:
+            VirtualClock: The virtual clock instance being controlled
+        """
+        return self._virtual_clock
 
     def _current_time(self) -> timedelta | datetime | Any:
         """
@@ -37,11 +47,11 @@ class VirtualClockController:
             Union[timedelta, datetime, Any]: The current virtual time. If the clock is ticking,
             returns the calculated UTC time based on the last update. Otherwise, returns the static time.
         """
-        if self.virtual_clock.tick_enabled:
+        if self._virtual_clock.tick_enabled:
             now = timezone.now()
-            delta = now - self.virtual_clock.last_updated
-            return self.virtual_clock.current_time + delta
-        return self.virtual_clock.current_time
+            delta = now - self._virtual_clock.last_updated
+            return self._virtual_clock.current_time + delta
+        return self._virtual_clock.current_time
 
     def get_iso_time(self) -> str:
         """
@@ -70,9 +80,9 @@ class VirtualClockController:
         Returns:
             User: The user who owns this virtual clock
         """
-        return self.virtual_clock.user_owner
+        return self._virtual_clock.user_owner
 
-    def set_time(self, new_time: datetime) -> VirtualClock:
+    def set_time(self, new_time: datetime) -> Type['VirtualClockController']:
         """
         Set the virtual clock to a specific time and stop the tick.
 
@@ -84,12 +94,12 @@ class VirtualClockController:
             Note: Changes are in memory only, call save() to persist to database.
         """
         now = timezone.now()
-        self.virtual_clock.current_time = new_time
-        self.virtual_clock.last_updated = now
-        self.virtual_clock.tick_enabled = False
-        return self.virtual_clock
+        self._virtual_clock.current_time = new_time
+        self._virtual_clock.last_updated = now
+        self._virtual_clock.tick_enabled = False
+        return self
 
-    def set_real_time(self) -> VirtualClock:
+    def set_real_time(self) -> Type['VirtualClockController']:
         """
         Set the virtual clock to the current real time and stop the tick.
         
@@ -98,14 +108,14 @@ class VirtualClockController:
             Note: Changes are in memory only, call save() to persist to database.
         """
         now = timezone.now()
-        self.virtual_clock.current_time = now
-        self.virtual_clock.last_updated = now
-        self.virtual_clock.tick_enabled = False
-        return self.virtual_clock
+        self._virtual_clock.current_time = now
+        self._virtual_clock.last_updated = now
+        self._virtual_clock.tick_enabled = False
+        return self
 
 
 
-    def toggle_tick(self, enabled: bool = None) -> VirtualClock:
+    def toggle_tick(self, enabled: bool = None) -> Type['VirtualClockController']:
         """
         Toggle or set the tick status of the virtual clock.
         
@@ -118,12 +128,12 @@ class VirtualClockController:
             Note: Changes are in memory only, call save() to persist to database.
         """
         now = timezone.now()
-        self.virtual_clock.current_time = self._current_time()
-        self.virtual_clock.last_updated = now
-        self.virtual_clock.tick_enabled = not self.virtual_clock.tick_enabled if enabled is None else enabled
-        return self.virtual_clock
+        self._virtual_clock.current_time = self._current_time()
+        self._virtual_clock.last_updated = now
+        self._virtual_clock.tick_enabled = not self._virtual_clock.tick_enabled if enabled is None else enabled
+        return self
 
-    def set_clock_name(self, new_name: str):
+    def set_clock_name(self, new_name: str) -> Type['VirtualClockController']:
         """
         Змінює назву годинника у пам'яті (без запису в БД).
         Повертає оновлений об'єкт VirtualClock.
@@ -131,18 +141,18 @@ class VirtualClockController:
         if len(new_name) > 255:
             raise HttpError(400, "Name is too long (max 255)")
         logger.info(f"core.services.VirtualClockController.set_clock_name(): new_name: {new_name}")
-        self.virtual_clock.name = new_name
-        return self.virtual_clock
+        self._virtual_clock.name = new_name
+        return self
 
-    def save(self) -> VirtualClock:
+    def save(self) -> Type['VirtualClockController']:
         """
         Save the current state of the virtual clock to the database.
         
         Returns:
             VirtualClock: The saved VirtualClock instance.
         """
-        self.virtual_clock.save()
-        return self.virtual_clock
+        self._virtual_clock.save()
+        return self
 
     # retrieve a list of clocks
     @staticmethod
@@ -159,15 +169,18 @@ class VirtualClockController:
         """
         return VirtualClock.objects.filter(user_owner=user) | user.shared_clocks.all()
 
-    @staticmethod
-    def delete_clock(clock_instance) -> None:
+
+    def delete(self, user: User) -> Type['VirtualClockController']:
         """
         Delete the specified clock instance.
         
         Args:
-            clock_instance: The VirtualClock instance to delete
+            user (User): The user who owns the clock to delete.
         """
-        clock_instance.delete()
+        if self._virtual_clock.user_owner != user:
+            raise HttpError(403, "You are not the owner of this clock")
+        self._virtual_clock.delete()
+        return self
 
     @property
     def tick_status(self) -> bool:
@@ -177,9 +190,9 @@ class VirtualClockController:
         Returns:
             bool: True if the clock is ticking, False otherwise
         """
-        return self.virtual_clock.tick_enabled
+        return self._virtual_clock.tick_enabled
 
-    def update_allowed_users(self, payload: dict) -> None:
+    def update_allowed_users(self, payload: dict) -> Type['VirtualClockController']:
         """
         Update the list of users who have access to this virtual clock.
         
@@ -196,27 +209,27 @@ class VirtualClockController:
         """
         # Full update of allowed users
         if 'allowed_users' in payload:
-            self.virtual_clock.allowed_users.set(payload['allowed_users'])
+            self._virtual_clock.allowed_users.set(payload['allowed_users'])
             
         # Add users to existing allowed users
         if 'add_users' in payload and payload['add_users']:
-            self.virtual_clock.allowed_users.add(*payload['add_users'])
+            self._virtual_clock.allowed_users.add(*payload['add_users'])
             
         # Remove users from allowed users
         if 'remove_users' in payload and payload['remove_users']:
-            self.virtual_clock.allowed_users.remove(*payload['remove_users'])
+            self._virtual_clock.allowed_users.remove(*payload['remove_users'])
         if "allowed_users" in payload and payload["allowed_users"]:
             users = TimeShiftUser.objects.filter(id__in=payload["allowed_users"])
-            self.virtual_clock.allowed_users.set(users)
+            self._virtual_clock.allowed_users.set(users)
 
         # Додавання
         if "add_users" in payload and payload["add_users"]:
             users = TimeShiftUser.objects.filter(id__in=payload["add_users"])
-            self.virtual_clock.allowed_users.add(*users)
+            self._virtual_clock.allowed_users.add(*users)
 
         # Видалення
         if "remove_users" in payload and payload["remove_users"]:
             users = TimeShiftUser.objects.filter(id__in=payload["remove_users"])
-            self.virtual_clock.allowed_users.remove(*users)
+            self._virtual_clock.allowed_users.remove(*users)
 
-        return self.virtual_clock
+        return self
