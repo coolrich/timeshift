@@ -4,6 +4,7 @@ from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import AnonymousUser
 from django.db.models import QuerySet
 from django.http import Http404
+from ninja.errors import HttpError
 from ninja.security import HttpBearer
 from django.contrib.auth import get_user_model
 from ninja.security.base import AuthBase
@@ -41,7 +42,7 @@ class SessionOrToken(AuthBase):
                 user: User = User.objects.get(api_token=token)
             except User.DoesNotExist:
                 logger.info(f"User not found for token: {token}")
-                raise Http404(f"User not found for token: {token}")
+                raise HttpError(401, f"Invalid authentication token")
             logger.info(f"Authenticated user {user.username} from token: {token}")
             logger.info(f"Action: {request.method} {request.path}")
             return user

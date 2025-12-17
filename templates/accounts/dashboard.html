@@ -5,50 +5,86 @@
 <h2 class="mb-4">Мій кабінет</h2>
 
 <div class="row g-4">
-  <div class="col-md-6 col-xl-3">
-    <div class="card shadow-sm">
-      <div class="card-body">
-        <h5 class="card-title text-muted">Віртуальні годинники</h5>
-        <h2>{{ total_clocks }}</h2>
-      </div>
+    <div class="col-md-6 col-xl-3">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title text-muted">Віртуальні годинники</h5>
+                <h2>{{ total_clocks }}</h2>
+            </div>
+        </div>
     </div>
-  </div>
-
-  <div class="col-md-6 col-xl-3">
-    <div class="card shadow-sm">
-      <div class="card-body">
-        <h5 class="card-title text-muted">Дата останнього входу</h5>
-        <p class="fs-5">{{ user.last_login|date:"d.m.Y H:i" }}</p>
-      </div>
-    </div>
-  </div>
 
     <div class="col-md-6 col-xl-3">
-    <div class="card shadow-sm">
-      <div class="card-body">
-        <h5 class="card-title text-muted">Дата створення останнього годинника</h5>
-        <p class="fs-5">{{ latest_clock.created_at|date:"d.m.Y H:i" }}</p>
-      </div>
-    </div>
-  </div>
-
-  <div class="col-md-12">
-    <div class="card shadow-sm mt-3">
-      <div class="card-body">
-        <h5 class="card-title">API Токен користувача</h5>
-        <div class="d-flex align-items-center">
-          <code id="user-token">{{ user.api_token|slice:":8" }}•••{{ user.api_token|slice:"-4:" }}</code>
-          <button class="btn btn-sm btn-outline-secondary ms-2" onclick="copyToken('{{ user.api_token }}')">Копіювати</button>
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title text-muted">Дата останнього входу</h5>
+                <p class="fs-5">{{ user.last_login|date:"d.m.Y H:i" }}</p>
+            </div>
         </div>
-      </div>
     </div>
-  </div>
+
+    <div class="col-md-6 col-xl-3">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title text-muted">Дата створення останнього годинника</h5>
+                <p class="fs-5">{{ latest_clock.created_at|date:"d.m.Y H:i" }}</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-12">
+        <div class="card shadow-sm mt-3">
+            <div class="card-body">
+                <h5 class="card-title">API токен користувача</h5>
+
+                <div class="d-flex align-items-center">
+                    <code id="user-token"
+                          data-full="{{ user.api_token }}"
+                          data-short="{{ user.api_token|slice:" :8" }}•••{{ user.api_token|slice:"-4:" }}"
+                    data-visible="false">
+                    {{ user.api_token|slice:":8" }}•••{{ user.api_token|slice:"-4:" }}
+                    </code>
+
+                    <button class="btn btn-sm btn-outline-secondary ms-2"
+                            onclick="toggleToken(this)">
+                        Показати
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary ms-2"
+                            onclick="copyToken(document.getElementById('user-token').dataset.full)">
+                        Копіювати
+                    </button>
+                    <form method="post" action="{% url 'user_token_update' %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-outline-secondary ms-2">Оновити</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function toggleToken(btn) {
+          const tokenEl = document.getElementById('user-token');
+          const visible = tokenEl.dataset.visible === 'true';
+
+          if (visible) {
+            tokenEl.textContent = tokenEl.dataset.short;
+            btn.textContent = 'Показати';
+            tokenEl.dataset.visible = 'false';
+          } else {
+            tokenEl.textContent = tokenEl.dataset.full;
+            btn.textContent = 'Сховати';
+            tokenEl.dataset.visible = 'true';
+          }
+        }
+    </script>
+
 </div>
 
 <script>
-function copyToken(token) {
-  navigator.clipboard.writeText(token);
-  alert("Токен скопійовано!");
-}
+    function copyToken(token) {
+      navigator.clipboard.writeText(token);
+      alert("Токен скопійовано!");
+    }
 </script>
 {% endblock %}

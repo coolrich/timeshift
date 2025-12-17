@@ -1,7 +1,8 @@
 from django.urls import path
 
 from .views import SignUpView, ProfileDashboardView, ProfileSettingsView, ProfileClocksView, \
-    ProfileTokensView, ClockDetailView, ClockCreateView, ClockDeleteView, ClockStateControlView, ClockTimeControlView
+    ProfileTokensView, ClockDetailView, ClockCreateView, ClockDeleteView, ClockStateControlView, ClockTimeControlView, \
+    UserTokenUpdateView
 from django.contrib.auth import views as auth_views
 
 urlpatterns = [
@@ -18,5 +19,6 @@ urlpatterns = [
     path("clocks/new/", ClockCreateView.as_view(), name="clock_create"),
     path("clocks/<int:pk>/delete/", ClockDeleteView.as_view(), name="clock_delete"),
     path('settings/', ProfileSettingsView.as_view(), name='profile_settings'),
+    path('user/', UserTokenUpdateView.as_view(), name='user_token_update')
     # path("api/", "accounts.api.router", name="accounts_api"),
 ]

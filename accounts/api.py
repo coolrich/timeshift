@@ -10,6 +10,7 @@ logger = getLogger(__name__)
 User = get_user_model()
 router = Router()
 
+
 # @router.get("/test/", response=UserDataResponse,
 #             description='Check if api is working')
 # def test(request):
@@ -32,9 +33,11 @@ def update_user(request, payload: UserUpdateRequest):
     logger.debug(f"core.api.update_clock(): payload_dict: {payload_dict}")
     changed_fields = []
     user = UserController(request.auth)
-    user.update(payload)
-    changed_fields.append("api_token")
+    logger.debug(f"core.api.update_clock(): payload_dict:{payload_dict}")
+    if payload_dict["refresh_token"]:
+        user.update_token()
 
+    changed_fields.append("api_token")
     # logger.info(f"core.api.update_clock(): changed_fields: {changed_fields}")
     user.save()
     logger.info(f"core.api.update_clock(): new token: {user.api_token}")

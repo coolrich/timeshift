@@ -18,6 +18,7 @@ logger = getLogger(__name__)
 User = get_user_model()
 router = Router()
 
+
 # TODO: review the method
 def get_v_clock_controller(request, clock_id: int) -> tuple[VirtualClockController, User]:
     user = request.auth
@@ -116,9 +117,7 @@ def get_v_clock_controller(request, clock_id: int) -> tuple[VirtualClockControll
 #     }
 
 
-
-
-@router.post("/setreal/", response={200:TimeResponse, 403:ErrorClockResponse})
+@router.post("/setreal/", response={200: TimeResponse, 403: ErrorClockResponse})
 def set_real(request, payload: BaseClockRequest):
     """
     Set clock time to current real (system) time.
@@ -143,12 +142,13 @@ def set_real(request, payload: BaseClockRequest):
         "message": "Time set to real time"
     }
 
+
 # ================
 # CRUD ops
 # ================
 
 
-@router.post("/clocks/", response={201:VirtualClockInfo, 403:ErrorClockResponse})
+@router.post("/clocks/", response={201: VirtualClockInfo, 403: ErrorClockResponse})
 def create_clock(request, payload: Optional[CreateClockRequest] = None):
     """
     Create a new virtual clock.
@@ -163,16 +163,18 @@ def create_clock(request, payload: Optional[CreateClockRequest] = None):
         name=payload.name if payload else None
         # f"Clock {VirtualClock.objects.filter(user_owner=user).count() + 1}"
     )
-    return Response(data=VirtualClockInfo(
-        id=clock.id,
-        name=clock.name,
-        tick_enabled=clock.tick_enabled,
-        current_time=clock.current_time.isoformat()
-    ),
+    return Response(
+        data=VirtualClockInfo(
+            id=clock.id,
+            name=clock.name,
+            tick_enabled=clock.tick_enabled,
+            current_time=clock.current_time.isoformat()
+        ),
         status=201)
 
+
 # 🟢 RETRIEVE (отримати один годинник)
-@router.get("/clocks/{clock_id}/", response={200:TimeData, 403:ErrorClockResponse})
+@router.get("/clocks/{clock_id}/", response={200: TimeData, 403: ErrorClockResponse})
 def retrieve_clock(request, clock_id: int):
     """
     Retrieve a single clock by ID.
@@ -189,8 +191,9 @@ def retrieve_clock(request, clock_id: int):
         tick_enabled=controller.tick_status
     )
 
+
 # 🟢 LIST (отримати всі годинники)
-@router.get("/clocks/", response={200:List[TimeData], 403:ErrorClockResponse})
+@router.get("/clocks/", response={200: List[TimeData], 403: ErrorClockResponse})
 def list_clocks(request):
     """
     List all clocks available to the authenticated user.
@@ -227,7 +230,7 @@ def list_clocks(request):
     return clocks
 
 
-@router.put("/clocks/", response={200:TimeDataUpdate, 403:ErrorClockResponse})
+@router.put("/clocks/", response={200: TimeDataUpdate, 403: ErrorClockResponse})
 def update_clock(request, payload: ClockUpdateRequest):
     """
     Update clock properties.
@@ -281,11 +284,10 @@ def update_clock(request, payload: ClockUpdateRequest):
         name=clock.name if "name" in changed_fields else None,
         time=controller.get_iso_time() if "time" in changed_fields else None,
         tick_enabled=controller.tick_status if "tick_enabled" in changed_fields else None,
-        allowed_users=list(clock.allowed_users.values_list("id", flat=True)) if "allowed_users" in changed_fields else None,
+        allowed_users=list(
+            clock.allowed_users.values_list("id", flat=True)) if "allowed_users" in changed_fields else None,
         changed_fields=changed_fields
     )
-
-
 
 
 @router.delete(

@@ -1,8 +1,7 @@
-from django.test import TestCase
-from django.contrib.auth import get_user_model
 from logging import getLogger
 
-from django.urls import reverse
+from django.contrib.auth import get_user_model
+from django.test import TestCase
 
 User = get_user_model()
 logger = getLogger(__name__)
@@ -18,6 +17,3 @@ class UserModelTests(TestCase):
     def test_create_user_with_fullname(self):
         User.objects.create(username="John", full_name="John Doe")
         self.assertTrue(User.objects.filter(full_name="John Doe").exists())
-
-
-

@@ -11,6 +11,7 @@ from core.models import VirtualClock
 logger = getLogger(__name__)
 User = get_user_model()
 
+
 class SignUpViewTests(TestCase):
 
     def test_signup_get_renders_form(self):
@@ -69,6 +70,7 @@ class ProfileDashboardViewTests(TestCase):
         self.assertIn("user", response.context)
         self.assertEqual(response.context["user"].api_token, self.user.api_token)
 
+
 class ProfileTokensViewTests(TestCase):
 
     def setUp(self):
@@ -83,6 +85,7 @@ class ProfileTokensViewTests(TestCase):
         self.assertTemplateUsed(response, "accounts/tokens.html")
         self.assertIn("user", response.context)
         self.assertIn("virtual_clocks", response.context)
+
 
 class ProfileClocksViewTest(TestCase):
 
@@ -153,6 +156,7 @@ class ClockCreateViewTest(TestCase):
         self.assertIn("form", response.context)
         self.assertIn("name", response.context["form"].fields)
 
+
 class ClockDeleteViewTest(TestCase):
 
     def setUp(self):
@@ -199,7 +203,8 @@ class ProfileSettingsViewTest(TestCase):
         self.tz = "Europe/Kyiv"
         self.em = "emily@example.com"
         self.pn = "+380969817231"
-        self.user = User.objects.create_user(username=self.un, password=self.ps, timezone=self.tz, email=self.em, phone_number=self.pn)
+        self.user = User.objects.create_user(username=self.un, password=self.ps, timezone=self.tz, email=self.em,
+                                             phone_number=self.pn)
         self.client.login(username=self.un, password=self.ps)
         self.url = reverse("profile_settings")
 
@@ -235,7 +240,6 @@ class ProfileSettingsViewTest(TestCase):
                                  details[0]['message'])
 
 
-
 class ClockStateControlViewTest(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="emily", password="verySecret123!")
@@ -255,6 +259,7 @@ class ClockStateControlViewTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(VirtualClock.objects.count(), 1)
         self.assertNotEqual(VirtualClock.objects.first().tick_enabled, old_state)
+
 
 class ClockTimeControlViewTest(TestCase):
     def setUp(self):
@@ -281,3 +286,21 @@ class ClockTimeControlViewTest(TestCase):
         # logger.debug(f"Response: {response.content}")
         self.assertRedirects(response, reverse("clock_detail", args=[self.clock.id]))
         self.assertContains(response, "Не вдалося встановити час. Перевірте правильність формату ISO 8601")
+
+
+class UserTokenUpdateViewTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="emily",
+                                             password="verySecret123!",
+                                             email="emily@example.com",
+                                             phone_number="+380969817231")
+        self.client.login(username="emily", password="verySecret123!")
+        self.url = reverse("user_token_update")
+
+    def test_update_user_api_token_view(self):
+        old_token = self.user.api_token
+        r = self.client.post(self.url, {"refresh_token": True})
+        # logger.debug(f"test_update_user_api_token_view():  self.client.post: response:\n{r}")
+        self.assertEqual(r.status_code, 302)
+        self.user.refresh_from_db()
+        self.assertNotEqual(old_token, self.user.api_token)

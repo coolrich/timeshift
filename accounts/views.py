@@ -174,7 +174,7 @@ class ClockStateControlView(LoginRequiredMixin, View):
         if referrer:
             return redirect(referrer) #, kwargs={"pk": kwargs['pk']})
         else:
-            return redirect(reverse('profile_clocks'))
+            return redirect(reverse('home'))
 
 class ClockTimeControlView(LoginRequiredMixin, View):
     success_url = reverse_lazy("profile_clocks")
@@ -205,3 +205,14 @@ class ClockTimeControlView(LoginRequiredMixin, View):
         controller.save()
         return redirect(reverse('clock_detail', kwargs={"pk": kwargs['pk']}))
 
+class UserTokenUpdateView(LoginRequiredMixin, View):
+    def post(self, request, *args, **kwargs):
+        logger.debug(f"UserTokenUpdateView(): post(): old token\n{request.user.api_token}")
+        user = UserController(self.request.user).update_token()
+        user.save()
+        logger.debug(f"UserTokenUpdateView(): post(): new token generated:\n{user.api_token}")
+        referer = request.META.get("HTTP_REFERER")
+        if referer:
+            return redirect(referer)
+        else:
+            return redirect(reverse('home'))
