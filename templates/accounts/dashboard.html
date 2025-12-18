@@ -61,27 +61,32 @@
             </div>
         </div>
     </div>
-
-    <script>
-        function toggleToken(btn) {
-          const tokenEl = document.getElementById('user-token');
-          const visible = tokenEl.dataset.visible === 'true';
-
-          if (visible) {
-            tokenEl.textContent = tokenEl.dataset.short;
-            btn.textContent = 'Показати';
-            tokenEl.dataset.visible = 'false';
-          } else {
-            tokenEl.textContent = tokenEl.dataset.full;
-            btn.textContent = 'Сховати';
-            tokenEl.dataset.visible = 'true';
-          }
-        }
-    </script>
-
+    {% if messages %}
+    {% for message in messages %}
+    <div class="alert alert-info alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endfor %}
+    {% endif %}
 </div>
 
 <script>
+    function toggleToken(btn) {
+      const tokenEl = document.getElementById('user-token');
+      const visible = tokenEl.dataset.visible === 'true';
+
+      if (visible) {
+        tokenEl.textContent = tokenEl.dataset.short;
+        btn.textContent = 'Показати';
+        tokenEl.dataset.visible = 'false';
+      } else {
+        tokenEl.textContent = tokenEl.dataset.full;
+        btn.textContent = 'Сховати';
+        tokenEl.dataset.visible = 'true';
+      }
+    }
+
     function copyToken(token) {
       navigator.clipboard.writeText(token);
       alert("Токен скопійовано!");

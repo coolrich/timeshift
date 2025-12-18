@@ -82,13 +82,13 @@ class VirtualClockController:
         """
         return self._virtual_clock.user_owner
 
-    def set_time(self, new_time: datetime) -> Type['VirtualClockController']:
+    def set_time(self, new_time: datetime, save: bool=True) -> Type['VirtualClockController']:
         """
         Set the virtual clock to a specific time and stop the tick.
 
         Args:
             new_time (datetime): The new time to set for the virtual clock.
-
+            save (bool): automatically save to database if True
         Returns:
             VirtualClock: The updated VirtualClock instance.
             Note: Changes are in memory only, call save() to persist to database.
@@ -97,31 +97,37 @@ class VirtualClockController:
         self._virtual_clock.current_time = new_time
         self._virtual_clock.last_updated = now
         self._virtual_clock.tick_enabled = False
+        if save:
+            self.save()
         return self
 
-    def set_real_time(self) -> Type['VirtualClockController']:
+    def set_real_time(self, save: bool=True) -> Type['VirtualClockController']:
         """
         Set the virtual clock to the current real time and stop the tick.
-        
+
+        Args:
+            save (bool): automatically save to database if True
         Returns:
             VirtualClock: The updated VirtualClock instance.
-            Note: Changes are in memory only, call save() to persist to database.
         """
         now = timezone.now()
         self._virtual_clock.current_time = now
         self._virtual_clock.last_updated = now
         self._virtual_clock.tick_enabled = False
+        if save:
+            self.save()
         return self
 
 
 
-    def toggle_tick(self, enabled: bool = None) -> Type['VirtualClockController']:
+    def toggle_tick(self, enabled: bool = None, save: bool=True) -> Type['VirtualClockController']:
         """
         Toggle or set the tick status of the virtual clock.
         
         Args:
-            enabled (bool, optional): If provided, sets the tick to this value.
-                                    If None, toggles the current state.
+            enabled (bool, optional): If provided, sets the tick to this value. If None, toggles the current state.
+            save (bool): automatically save to database if True
+
                                     
         Returns:
             VirtualClock: The updated VirtualClock instance.
@@ -131,17 +137,24 @@ class VirtualClockController:
         self._virtual_clock.current_time = self._current_time()
         self._virtual_clock.last_updated = now
         self._virtual_clock.tick_enabled = not self._virtual_clock.tick_enabled if enabled is None else enabled
+        if save:
+            self.save()
         return self
 
-    def set_clock_name(self, new_name: str) -> Type['VirtualClockController']:
+    def set_clock_name(self, new_name: str, save: bool=True) -> Type['VirtualClockController']:
         """
-        Змінює назву годинника у пам'яті (без запису в БД).
-        Повертає оновлений об'єкт VirtualClock.
+        Повертає оновлений об'єкт VirtualClockController.
+
+        Args:
+            save (bool): automatically save to database if True
+
         """
         if len(new_name) > 255:
             raise HttpError(400, "Name is too long (max 255)")
         logger.info(f"core.services.VirtualClockController.set_clock_name(): new_name: {new_name}")
         self._virtual_clock.name = new_name
+        if save:
+            self.save()
         return self
 
     def save(self) -> Type['VirtualClockController']:

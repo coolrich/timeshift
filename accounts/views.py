@@ -1,6 +1,7 @@
 import datetime
 from logging import getLogger
 
+
 import pytz
 from django.contrib import messages
 from django.contrib.auth import get_user_model
@@ -16,8 +17,12 @@ from django.views.generic.edit import ModelFormMixin
 
 from core.models import VirtualClock
 from core.services import VirtualClockController
+from .exceptions import TokenRefreshTooOften
 from .forms import TimeShiftUserCreationForm, UserSettingsForm, VirtualClockForm
 from .services import UserController
+from babel.dates import format_date, format_timedelta
+
+# locale.setlocale(locale.LC_TIME, "uk-UA.UTF-8")
 
 logger = getLogger(__name__)
 
@@ -165,8 +170,12 @@ class ClockStateControlView(LoginRequiredMixin, View):
         clock = get_object_or_404(self.get_queryset(), pk=pk)
 
         controller = VirtualClockController(clock)
-        controller.toggle_tick()
-        controller.save()
+        name = request.POST.get('name')
+        if name:
+            controller.set_clock_name(name)
+        else:
+            controller.toggle_tick()
+        # controller.save()
         # logger.error(f"ClockCreateView.form_valid(): TypeError: {e}")
         # messages.error(self.request, "Не вдалося встановити час. Перевірте правильність формату ISO 8601")
         # logger.debug(f"ClockStateControlView.post(): clock_id={kwargs['pk']}")
@@ -201,16 +210,26 @@ class ClockTimeControlView(LoginRequiredMixin, View):
             logger.error(f"ClockTimeControlView.post(): ValueError: {e}")
             messages.error(self.request, "Не вдалося встановити час. Перевірте правильність формату ISO 8601")
             return redirect(reverse('clock_detail', kwargs={"pk": kwargs['pk']}))
+        # set_time automatically save state to DB
         controller.set_time(dt_user)
-        controller.save()
+        # controller.save()
         return redirect(reverse('clock_detail', kwargs={"pk": kwargs['pk']}))
 
 class UserTokenUpdateView(LoginRequiredMixin, View):
     def post(self, request, *args, **kwargs):
         logger.debug(f"UserTokenUpdateView(): post(): old token\n{request.user.api_token}")
-        user = UserController(self.request.user).update_token()
-        user.save()
-        logger.debug(f"UserTokenUpdateView(): post(): new token generated:\n{user.api_token}")
+        try:
+            user = UserController(self.request.user).update_token()
+            logger.debug(f"UserTokenUpdateView(): post(): new token generated:\n{user.api_token}")
+        except TokenRefreshTooOften as e:
+            logger.debug(f"UserTokenUpdateView.post(): token update error")
+            total_seconds = User.get_token_refresh_cooldown().total_seconds()
+            t = format_timedelta(total_seconds,locale='uk', format='short')
+            # logger.debug(f"UserTokenUpdateView.post(): help(TOKEN_REFRESH_COOLDOWN):{help(User.TOKEN_REFRESH_COOLDOWN)}")
+            messages.error(
+                request,
+                f"Токен можна оновлювати раз на {t}. Спробуй через {e.retry_after} с."
+            )
         referer = request.META.get("HTTP_REFERER")
         if referer:
             return redirect(referer)

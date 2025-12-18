@@ -128,8 +128,9 @@ def set_real(request, payload: BaseClockRequest):
     """
     clock_id = payload.clock_id
     controller, user = get_v_clock_controller(request, clock_id)
+    # automatically save state to DB
     controller.set_real_time()
-    controller.save()
+    # controller.save()
     return {
         "status": "success",
         "data": TimeData(
@@ -250,18 +251,18 @@ def update_clock(request, payload: ClockUpdateRequest):
         is_valid, new_time = TimeService.validate_time_format(payload_dict["time"])
         if not is_valid:
             raise HttpError(400, "Invalid time format")
-        controller.set_time(new_time)
+        controller.set_time(new_time, save=False)
         changed_fields.append("time")
 
     # 2) Оновлення tick
     if payload_dict.get("tick_enabled") is not None:
-        controller.toggle_tick(payload_dict["tick_enabled"])
+        controller.toggle_tick(payload_dict["tick_enabled"], save=False)
         changed_fields.append("tick_enabled")
 
     # 3) Оновлення імені
     if payload_dict.get("name") is not None:
         name = (payload_dict["name"] or "").strip()
-        controller.set_clock_name(name)
+        controller.set_clock_name(name, save=False)
         changed_fields.append("name")
 
     relevant_keys = {"allowed_users", "add_users", "remove_users"}

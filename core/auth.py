@@ -39,7 +39,7 @@ class SessionOrToken(AuthBase):
         if auth.lower().startswith("bearer "):
             token = auth[7:].strip()
             try:
-                user: User = User.objects.get(api_token=token)
+                user: User = User.objects.get(_api_token=token)
             except User.DoesNotExist:
                 logger.info(f"User not found for token: {token}")
                 raise HttpError(401, f"Invalid authentication token")
