@@ -26,6 +26,8 @@
       </span>
       <form method="post" action="{% url 'clock_control' clock.id %}">
         {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <input type="hidden" name="toggle_tick" value="toggle_tick">
         <button type="submit" class="btn btn-sm btn-outline-primary">
         {% if clock.tick_enabled %}
             ⏸
@@ -39,14 +41,14 @@
   </div>
 {% endfor %}
 
-{% if messages %}
-  {% for message in messages %}
-    <div class="alert alert-info alert-dismissible fade show" role="alert">
-      {{ message }}
-      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-  {% endfor %}
-{% endif %}
+<!--{% if messages %}-->
+<!--  {% for message in messages %}-->
+<!--    <div class="alert alert-info alert-dismissible fade show" role="alert">-->
+<!--      {{ message }}-->
+<!--      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>-->
+<!--    </div>-->
+<!--  {% endfor %}-->
+<!--{% endif %}-->
 
 
   </div>

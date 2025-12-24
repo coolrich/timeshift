@@ -40,7 +40,7 @@
                 <div class="d-flex align-items-center">
                     <code id="user-token"
                           data-full="{{ user.api_token }}"
-                          data-short="{{ user.api_token|slice:" :8" }}•••{{ user.api_token|slice:"-4:" }}"
+                          data-short="{{ user.api_token|slice:":8" }}•••{{ user.api_token|slice:"-4:" }}"
                     data-visible="false">
                     {{ user.api_token|slice:":8" }}•••{{ user.api_token|slice:"-4:" }}
                     </code>
@@ -53,22 +53,19 @@
                             onclick="copyToken(document.getElementById('user-token').dataset.full)">
                         Копіювати
                     </button>
-                    <form method="post" action="{% url 'user_token_update' %}">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-sm btn-outline-secondary ms-2">Оновити</button>
-                    </form>
+
                 </div>
             </div>
         </div>
     </div>
-    {% if messages %}
-    {% for message in messages %}
-    <div class="alert alert-info alert-dismissible fade show" role="alert">
-        {{ message }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-    {% endfor %}
-    {% endif %}
+<!--    {% if messages %}-->
+<!--    {% for message in messages %}-->
+<!--    <div class="alert alert-info alert-dismissible fade show" role="alert">-->
+<!--        {{ message }}-->
+<!--        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>-->
+<!--    </div>-->
+<!--    {% endfor %}-->
+<!--    {% endif %}-->
 </div>
 
 <script>

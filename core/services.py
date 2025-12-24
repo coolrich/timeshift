@@ -196,6 +196,10 @@ class VirtualClockController:
         return self
 
     @property
+    def clock_name(self) -> str:
+        return self._virtual_clock.name
+
+    @property
     def tick_status(self) -> bool:
         """
         Get the current tick status of the virtual clock.

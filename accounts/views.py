@@ -1,16 +1,16 @@
 import datetime
 from logging import getLogger
 
-
 import pytz
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth import login
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import IntegrityError
-from django.shortcuts import get_object_or_404, redirect
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy, reverse
 from django.utils import timezone as dj_tz
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views import View
 from django.views.generic import CreateView, TemplateView, ListView, UpdateView, DetailView, DeleteView
 from django.views.generic.edit import ModelFormMixin
@@ -26,6 +26,7 @@ from babel.dates import format_date, format_timedelta
 
 logger = getLogger(__name__)
 
+
 class SignUpView(CreateView):
     form_class = TimeShiftUserCreationForm
     success_url = reverse_lazy("profile_dashboard")
@@ -36,6 +37,7 @@ class SignUpView(CreateView):
         user = self.object
         login(self.request, user)
         return response
+
 
 # class ProfileView(LoginRequiredMixin, TemplateView):
 #     model = get_user_model()
@@ -48,6 +50,7 @@ class SignUpView(CreateView):
 #         return context
 
 User = get_user_model()
+
 
 # 🧭 1. Головна сторінка (дашборд)
 class ProfileDashboardView(LoginRequiredMixin, TemplateView):
@@ -88,18 +91,19 @@ class ProfileClocksView(LoginRequiredMixin, ListView):
     def get_queryset(self):
         return self.request.user.virtual_clocks.all()
 
-
     # def get_context_data(self, **kwargs):
     #     context = super().get_context_data(**kwargs)
     #     context["form"] = self.form_class()
     #     return context
 
-class ClockDetailView(LoginRequiredMixin, DetailView, ModelFormMixin):
+
+class ClockDetailView(LoginRequiredMixin, DetailView):
     model = VirtualClock
     template_name = "accounts/clock_detail.html"
     context_object_name = "clock"
-    # fields = ["current_time"]
-    form_class = VirtualClockForm
+    fields = ["current_time", "tick_enabled"]
+
+    # form_class = VirtualClockForm
 
     def get_queryset(self):
         # тільки годинники користувача
@@ -110,6 +114,7 @@ class ClockDetailView(LoginRequiredMixin, DetailView, ModelFormMixin):
         # vcc = VirtualClockController(self.request.user.virtual_clocks.get(id=self.kwargs["pk"]))
         vcc = VirtualClockController(self.object)
         context["current_time"] = vcc.get_time()
+        # context['tick_enabled'] = vcc.tick_status
         user_tz = self.request.user.timezone
         dj_tz.activate(user_tz)
         logger.debug(f"Current time: {vcc.get_iso_time()}")
@@ -133,6 +138,7 @@ class ClockCreateView(LoginRequiredMixin, CreateView):
             messages.error(self.request, "Не вдалося створити годинник. Перевищено ліміт годинників.")
             return redirect("profile_clocks")
 
+
 class ClockDeleteView(LoginRequiredMixin, DeleteView):
     model = VirtualClock
     template_name = "accounts/clock_confirm_delete.html"
@@ -141,6 +147,7 @@ class ClockDeleteView(LoginRequiredMixin, DeleteView):
     def get_queryset(self):
         # дозволяємо видаляти лише свої годинники
         return self.request.user.virtual_clocks.all()
+
 
 # ⚙️ 4. Налаштування користувача
 class ProfileSettingsView(LoginRequiredMixin, UpdateView):
@@ -181,9 +188,10 @@ class ClockStateControlView(LoginRequiredMixin, View):
         # logger.debug(f"ClockStateControlView.post(): clock_id={kwargs['pk']}")
         referrer = request.META.get("HTTP_REFERER")
         if referrer:
-            return redirect(referrer) #, kwargs={"pk": kwargs['pk']})
+            return redirect(referrer)  # , kwargs={"pk": kwargs['pk']})
         else:
             return redirect(reverse('home'))
+
 
 class ClockTimeControlView(LoginRequiredMixin, View):
     success_url = reverse_lazy("profile_clocks")
@@ -215,6 +223,7 @@ class ClockTimeControlView(LoginRequiredMixin, View):
         # controller.save()
         return redirect(reverse('clock_detail', kwargs={"pk": kwargs['pk']}))
 
+
 class UserTokenUpdateView(LoginRequiredMixin, View):
     def post(self, request, *args, **kwargs):
         logger.debug(f"UserTokenUpdateView(): post(): old token\n{request.user.api_token}")
@@ -224,7 +233,7 @@ class UserTokenUpdateView(LoginRequiredMixin, View):
         except TokenRefreshTooOften as e:
             logger.debug(f"UserTokenUpdateView.post(): token update error")
             total_seconds = User.get_token_refresh_cooldown().total_seconds()
-            t = format_timedelta(total_seconds,locale='uk', format='short')
+            t = format_timedelta(total_seconds, locale='uk', format='short')
             # logger.debug(f"UserTokenUpdateView.post(): help(TOKEN_REFRESH_COOLDOWN):{help(User.TOKEN_REFRESH_COOLDOWN)}")
             messages.error(
                 request,
@@ -235,3 +244,73 @@ class UserTokenUpdateView(LoginRequiredMixin, View):
             return redirect(referer)
         else:
             return redirect(reverse('home'))
+
+
+class ClockControlView(LoginRequiredMixin, View):
+    def get_queryset(self):
+        return self.request.user.virtual_clocks.all()
+
+    def post(self, request, *args, **kwargs):
+        pk = kwargs.get("pk")
+        clock = get_object_or_404(self.get_queryset(), pk=pk)
+        controller: VirtualClockController = VirtualClockController(clock)
+        context = {"clock": clock, "current_time": controller.get_time()}
+        messages_to_user = []
+
+        # --- Назва ---
+        name = request.POST.get("clock_name")
+        if name and name != controller.clock_name:
+            controller.set_clock_name(name, save=False)
+            messages_to_user.append(f"Назва годинника змінена на {name}")
+
+        # --- Тікання ---
+        element = request.POST.get("tick_enabled")
+        tick_enabled = element == "on"
+        if element and tick_enabled != controller.tick_status:
+            logger.debug(f"ClockControlView.post(): if tick_enabled != controller.tick_status")
+            controller.toggle_tick(save=False)  # або окремий метод set_tick(tick_enabled)
+            state = "увімкнено" if tick_enabled else "вимкнено"
+            messages_to_user.append(f"Тікання годинника {state}")
+        if request.POST.get('toggle_tick'):
+            logger.debug(f"ClockControlView.post(): if request.POST.get('toggle_tick')")
+            controller.toggle_tick()
+            state = "увімкнено" if controller.tick_status else "вимкнено"
+            messages_to_user.append(f"Тікання годинника {state}")
+
+        # --- Час ---
+        current_time = request.POST.get("current_time")
+        if current_time:
+            try:
+                tz = pytz.timezone(request.user.timezone)
+                dt_naive = datetime.datetime.fromisoformat(current_time)
+                dt_user = tz.localize(dt_naive)
+                controller.set_time(dt_user, save=False)
+                messages_to_user.append(
+                    f"Час годинника оновлено на {dt_user}"
+                )
+            except (ValueError, pytz.UnknownTimeZoneError) as e:
+                messages.error(
+                    request,
+                    "Не вдалося встановити час. Перевірте правильність формату"
+                )
+                return render(
+                    request,
+                    "accounts/clock_detail.html",
+                    context,
+                    status=400,
+                )
+                # --- Відправка повідомлень ---
+        for msg in messages_to_user:
+            messages.success(request, msg)
+            logger.info(f"[ClockControlView] Clock(pk={pk}): {msg}")
+        controller.save()
+
+        next_url = request.POST.get("next")
+
+        if not next_url or not url_has_allowed_host_and_scheme(
+                next_url,
+                allowed_hosts={request.get_host()},
+        ):
+            next_url = reverse("home")
+
+        return redirect(next_url)

@@ -11,7 +11,7 @@
           <i class="bi bi-speedometer2 me-2"></i> Головна
         </a>
         <a href="{% url 'profile_tokens' %}" class="list-group-item list-group-item-action {% if 'tokens' in request.path %}active{% endif %}">
-          <i class="bi bi-key me-2"></i> API Токени
+          <i class="bi bi-key me-2"></i> API Токен
         </a>
         <a href="{% url 'profile_clocks' %}" class="list-group-item list-group-item-action {% if 'clocks' in request.path %}active{% endif %}">
           <i class="bi bi-clock me-2"></i> Віртуальні годинники
@@ -25,6 +25,9 @@
     <!-- Main content -->
     <div class="col-md-9 col-lg-10">
       {% block profile_content %}{% endblock %}
+      <div class="mt-4">
+      {% include 'includes/messages.html' %}
+      </div>
     </div>
   </div>
 </div>

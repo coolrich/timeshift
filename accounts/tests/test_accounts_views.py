@@ -1,10 +1,11 @@
 import datetime
 from logging import getLogger
 
-from Demos.win32ts_logoff_disconnected import username
+import pytz
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from core.models import VirtualClock
 
@@ -255,7 +256,7 @@ class ClockStateControlViewTest(TestCase):
 
     def test_control_view_post_toggles_clock(self):
         old_state = self.clock.tick_enabled
-        response = self.client.post(self.url, follow=True)
+        response = self.client.post(self.url, data={'toggle_tick': 'toggle_tick'}, follow=True)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(VirtualClock.objects.count(), 1)
         self.assertNotEqual(VirtualClock.objects.first().tick_enabled, old_state)
@@ -266,26 +267,35 @@ class ClockTimeControlViewTest(TestCase):
         self.user = User.objects.create_user(username="emily", password="verySecret123!")
         self.clock = VirtualClock.objects.create(user_owner=self.user)
         self.client.login(username="emily", password="verySecret123!")
-        self.url = reverse("clock_edit_time", args=[self.clock.id])
+        self.url = reverse("clock_control", args=[self.clock.id])
+        self.next = reverse("clock_detail", args=[self.clock.id])
 
     def test_view_edits_time(self):
-        now = '01.01.2025 12:00:00'
+        now = '2011-11-04 00:05:23.283'
+        now_dt = datetime.datetime.strptime(now, "%Y-%m-%d %H:%M:%S.%f")
         # logger.debug(f"Current time: {now}")
-        response = self.client.post(self.url, {"current_time": now}, follow=True)
+        response = self.client.post(self.url,
+                                    {"current_time": now, 'next': self.next},
+                                    follow=True)
+        logger.debug(f"response: {response.redirect_chain}")
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, "accounts/clock_detail.html")
         # self.assertRedirects(response, reverse("clock_detail", args=[self.clock.id]))
         self.assertContains(response, now)
-        self.assertEqual(VirtualClock.objects.first().current_time.strftime("%d.%m.%Y %H:%M:%S"), now)
+        tz = pytz.timezone(self.user.timezone)
+        clock = VirtualClock.objects.get(pk=self.clock.pk)
+        self.assertEqual(clock.current_time, tz.localize(now_dt))
 
     def test_view_edits_time_with_invalid_time(self):
         now = 'invalid_time'
-        response = self.client.post(self.url, {"current_time": now}, follow=True)
-        self.assertEqual(response.status_code, 200)
+        response = self.client.post(self.url,
+                                    {"current_time": now},
+                                    )
+        self.assertEqual(response.status_code, 400)
         self.assertTemplateUsed(response, "accounts/clock_detail.html")
-        # logger.debug(f"Response: {response.content}")
-        self.assertRedirects(response, reverse("clock_detail", args=[self.clock.id]))
-        self.assertContains(response, "Не вдалося встановити час. Перевірте правильність формату ISO 8601")
+        logger.debug(f"Response: {response.content.decode()}")
+        self.assertRaises(ValueError)
+        self.assertContains(response, "Не вдалося встановити час. Перевірте правильність формату", status_code=400)
 
 
 class UserTokenUpdateViewTest(TestCase):

@@ -3,54 +3,56 @@
 {% load tz %}
 
 {% block profile_content %}
-<h2>{{ clock.name }}</h2>
-<form method="post" action="{% url 'clock_control' clock.id %}">
-    {% csrf_token %}
-    <label for="name"><strong>Назва:</strong></label>
-    <input type="text" name="name" value="{{ clock.name }}">
-    <button type="submit">Зберегти</button>
-</form>
-<p><strong>Активність:</strong> {{ clock.tick_enabled|yesno:"увімкнений,вимкнений" }}</p>
 <p><strong>ID:</strong> {{ clock.id }}</p>
+
 <form method="post" action="{% url 'clock_control' clock.id %}">
     {% csrf_token %}
-    <button type="submit" class="btn btn-sm btn-outline-primary">
-        {% if clock.tick_enabled %}
-        ⏸
-        {% else %}
-        ▶
-        {% endif %}
-    </button>
-</form>
+    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+    <!-- Назва -->
+    <label for="clock_name"><strong>Назва:</strong></label>
+    <input type="text" name="clock_name" id="clock_name" value="{{ clock.name }}" class="form-control mb-2">
 
-<p><strong>Поточний локальний час:</strong>
-    {% localtime on %}
-    {{ current_time|date:"Y-m-d H:i:s" }}
-    {% endlocaltime %}
-</p>
+    <!-- Тікання -->
+    <div class="form-check mb-2">
+        <input class="form-check-input" type="checkbox" name="tick_enabled" id="tick_enabled"
+               {% if clock.tick_enabled %} checked {% endif %}>
+        <label class="form-check-label" for="tick_enabled">Тікання увімкнено</label>
+    </div>
 
-<p><strong>Поточний UTC час:</strong>
-    {{ current_time|utc|date:"Y-m-d H:i:s" }}
-</p>
+    <!-- Поточний час -->
+    <label for="current_time"><strong>Поточний час:</strong></label>
+    <p><strong>{{ current_time|date:"d.m.Y H:i:s" }}</strong></p>
 
-<h3>Змінити час</h3>
-{% if messages %}
-{% for message in messages %}
-<div class="alert alert-info alert-dismissible fade show" role="alert">
-    {{ message }}
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    <!-- Оновити час -->
+    <label for="current_time" class="form-label">
+    <strong>Оновити час</strong>
+</label>
+
+<div class="input-group mb-2">
+    <span class="input-group-text">ISO 8601</span>
+    <input
+        type="text"
+        name="current_time"
+        id="current_time"
+        class="form-control"
+        placeholder="2025-11-26T04:32:15"
+        title="формат ISO 8601 (без часового поясу)"
+    >
 </div>
-{% endfor %}
-{% endif %}
 
-<form method="post" action="{% url 'clock_edit_time' clock.id %}">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit" class="btn btn-primary mt-2">Зберегти</button>
+<button type="submit" class="btn btn-primary mt-2">Зберегти</button>
+
 </form>
+
+<!--{% if messages %}-->
+<!--    {% for message in messages %}-->
+<!--        <div class="alert alert-info alert-dismissible fade show mt-2" role="alert">-->
+<!--            {{ message }}-->
+<!--            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>-->
+<!--        </div>-->
+<!--    {% endfor %}-->
+<!--{% endif %}-->
 
 <hr>
 <a href="{% url 'profile_clocks' %}" class="btn btn-secondary mt-3">← Назад</a>
-
-
 {% endblock %}

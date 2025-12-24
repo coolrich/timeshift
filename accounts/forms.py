@@ -27,7 +27,7 @@ class UserSettingsForm(forms.ModelForm):
 class VirtualClockForm(forms.ModelForm):
     class Meta:
         model = VirtualClock
-        fields = ['current_time']
+        fields = ['current_time', 'tick_enabled']
         labels = {
             'current_time': 'Поточний час',  # нове ім'я для поля
         }
