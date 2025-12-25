@@ -1,19 +1,24 @@
+import logging
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import TransactionTestCase
 from django.utils import timezone as dj_timezone
+from freezegun import freeze_time
 
+from accounts.models import TimeShiftUser
 from core.models import VirtualClock
 from core.services import VirtualClockController
-from freezegun import freeze_time
+
+logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
 
 @freeze_time("2025-10-31 15:15:30")
-class TestVirtualClockController(TestCase):
+class TestVirtualClockController(TransactionTestCase):
+    reset_sequences = True
 
     def setUp(self):
         self.user = User.objects.create_user(username="testuser", password="testpass")
@@ -93,3 +98,50 @@ class TestVirtualClockController(TestCase):
         self.assertFalse(updated_clock.tick_enabled)
         self.assertEqual(updated_clock.last_updated, dj_timezone.now())
         self.assertEqual(updated_clock.current_time, self.controller._current_time())
+
+    def test_update_allowed_users_full_update(self):
+        another_user = User.objects.create_user(username='another', password='VeryStrongPass!@#')
+        another_user1 = User.objects.create_user(username='another1', password='iIfDYIGPBikpui%^')
+        payload = {
+            'allowed_users': [another_user.id, another_user1.id]
+        }
+        logger.debug(f"core.TestVirtualClockController.test_update_allowed_users_full_update(): payload {payload}")
+        self.controller.update_allowed_users(payload)
+        self.clock.refresh_from_db()
+        allowed_users = self.clock.allowed_users.values_list("id", flat=True)
+        logger.debug(
+            f"core.TestVirtualClockController.test_update_allowed_users_full_update(): self.clock.allowed_users: " +
+            f"{allowed_users}")
+        self.assertQuerySetEqual(allowed_users, {2,3}, ordered=False)
+
+    def test_update_allowed_users_add(self):
+        another_user = User.objects.create_user(username='another', password='VeryStrongPass!@#')
+        another_user1 = User.objects.create_user(username='another1', password='iIfDYIGPBikpui%^')
+        payload = {
+            'add_users': [another_user.id, another_user1.id]
+        }
+        self.controller.update_allowed_users(payload)
+        self.clock.refresh_from_db()
+        add_users = self.clock.allowed_users.values_list("id", flat=True)
+        logger.debug(
+            f"core.TestVirtualClockController.test_update_allowed_users_add(): self.clock.allowed_users: " +
+            f"{add_users}")
+        self.assertQuerySetEqual(add_users, {2, 3}, ordered=False)
+
+    def test_update_allowed_users_remove(self):
+        another_user = User.objects.create_user(username='another', password='VeryStrongPass!@#')
+        another_user1 = User.objects.create_user(username='another1', password='iIfDYIGPBikpui%^')
+        users = TimeShiftUser.objects.filter(id__in=[another_user.id, another_user1.id])
+        self.clock.allowed_users.set(users)
+        allowed_users = self.clock.allowed_users.values_list("id", flat=True)
+        logger.debug(
+            f"core.TestVirtualClockController.test_update_allowed_users_add(): self.clock.allowed_users: " +
+            f"{allowed_users}")
+        payload = {
+            'remove_users': [another_user.id, another_user1.id]
+        }
+        self.controller.update_allowed_users(payload)
+        logger.debug(
+            f"core.TestVirtualClockController.test_update_allowed_users_add(): self.clock.allowed_users: " +
+            f"{allowed_users}")
+        self.assertQuerySetEqual(allowed_users, {}, ordered=False)

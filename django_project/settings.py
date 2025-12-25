@@ -10,14 +10,10 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 import os
-from os import getenv
 from pathlib import Path
 
-import django
-from django.contrib.auth import get_user_model
-from django.core.management import call_command
-from dotenv import load_dotenv
 import dj_database_url
+from dotenv import load_dotenv
 
 load_dotenv()
 

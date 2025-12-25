@@ -1,9 +1,10 @@
+import logging
+
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.http import Http404
-import logging
+
 from core.models import VirtualClock
 from django_project.api import api
-from ninja.errors import HttpError
 
 logger = logging.getLogger(__name__)
 

@@ -1,9 +1,8 @@
+from django.contrib.auth import views as auth_views
 from django.urls import path
 
 from .views import SignUpView, ProfileDashboardView, ProfileSettingsView, ProfileClocksView, \
-    ProfileTokensView, ClockDetailView, ClockCreateView, ClockDeleteView, ClockStateControlView, ClockTimeControlView, \
-    UserTokenUpdateView, ClockControlView
-from django.contrib.auth import views as auth_views
+    ProfileTokensView, ClockDetailView, ClockCreateView, ClockDeleteView, UserTokenUpdateView, ClockControlView
 
 urlpatterns = [
     path('login/', auth_views.LoginView.as_view(template_name='login.html'), name='login'),

@@ -1,12 +1,10 @@
-import uuid
-import secrets
+import inspect
+import logging
+import warnings
 
+from django.contrib.auth import get_user_model
 from django.db import models, IntegrityError
 from django.utils import timezone
-from django.contrib.auth import get_user_model
-from django.db.models.signals import m2m_changed
-from django.dispatch import receiver
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +25,20 @@ class VirtualClock(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    def __init__(self, *args, **kwargs):
+        # Перевіряємо стек викликів
+        module_name = None
+        for frame in inspect.stack():
+            module_name = frame.frame.f_globals.get("__name__", "")
+            if module_name.startswith(("core.services", "threading")):
+                break
+        else:
+            warnings.warn(
+                f"VirtualClock використовується напряму в модулі {module_name}. Використовуйте VirtualClockController.",
+                stacklevel=2
+            )
+        super().__init__(*args, **kwargs)
 
     def save(self, *args, **kwargs):
         if self.pk and self.allowed_users.filter(pk=self.user_owner.pk).exists():

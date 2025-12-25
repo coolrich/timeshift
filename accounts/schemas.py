@@ -1,5 +1,7 @@
+from typing import Optional
+
 from ninja import Schema
-from typing import Optional, List
+
 
 # ======================
 # Запити

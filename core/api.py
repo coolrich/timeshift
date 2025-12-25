@@ -275,7 +275,7 @@ def update_clock(request, payload: ClockUpdateRequest):
             logger.info(f"User {user.username} is not the owner of clock {clock.id}")
             return 403, ErrorClockResponse(status="error", detail="Permission denied")
         filtered_payload = {k: v for k, v in payload_dict.items() if k in relevant_keys and v is not None}
-        controller.update_allowed_users(filtered_payload)
+        controller.update_allowed_users(filtered_payload, save=False)
         changed_fields.append("allowed_users")
 
     logger.info(f"core.api.update_clock(): changed_fields: {changed_fields}")

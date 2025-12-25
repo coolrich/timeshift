@@ -1,8 +1,10 @@
+from logging import getLogger
+
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 from ninja.testing import TestClient
+
 from accounts.api import router
-from django.contrib.auth import get_user_model
-from logging import getLogger
 
 logger = getLogger(__name__)
 

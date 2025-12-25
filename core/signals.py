@@ -1,12 +1,9 @@
-import datetime
-
-from django.db import IntegrityError
-from django.db.models.signals import post_save
-from django.dispatch import receiver
 from django.contrib.auth import get_user_model
-from .models import VirtualClock
+from django.db import IntegrityError
 from django.db.models.signals import m2m_changed
-from django.core.exceptions import ValidationError
+from django.dispatch import receiver
+
+from .models import VirtualClock
 
 User = get_user_model()
 

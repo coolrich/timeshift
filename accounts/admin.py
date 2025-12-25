@@ -1,7 +1,8 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
-from  .models import TimeShiftUser
+from .models import TimeShiftUser
+
 
 @admin.register(TimeShiftUser)
 class TimeShiftUserAdmin(admin.ModelAdmin):

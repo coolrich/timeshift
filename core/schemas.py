@@ -1,5 +1,6 @@
-from ninja import Schema
 from typing import Optional, List
+
+from ninja import Schema
 
 
 # ======================

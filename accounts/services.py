@@ -1,12 +1,10 @@
 import logging
-from datetime import timedelta
 
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 
 from .exceptions import TokenRefreshTooOften
-from .models import generate_api_token, TimeShiftUser
-from .schemas import UserUpdateRequest
+from .models import TimeShiftUser
 
 logger = logging.getLogger(__name__)
 User = get_user_model()

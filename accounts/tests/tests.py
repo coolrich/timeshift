@@ -1,8 +1,8 @@
-from django.test import TestCase, TransactionTestCase
-from django.contrib.auth import get_user_model
-from django.urls import reverse
 from logging import getLogger
 
+from django.contrib.auth import get_user_model
+from django.test import TestCase, TransactionTestCase
+from django.urls import reverse
 
 logger = getLogger(__name__)
 User = get_user_model()

@@ -2,6 +2,7 @@ import datetime
 from logging import getLogger
 
 import pytz
+from babel.dates import format_timedelta
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth import login
@@ -13,14 +14,12 @@ from django.utils import timezone as dj_tz
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views import View
 from django.views.generic import CreateView, TemplateView, ListView, UpdateView, DetailView, DeleteView
-from django.views.generic.edit import ModelFormMixin
 
 from core.models import VirtualClock
 from core.services import VirtualClockController
 from .exceptions import TokenRefreshTooOften
-from .forms import TimeShiftUserCreationForm, UserSettingsForm, VirtualClockForm
+from .forms import TimeShiftUserCreationForm, UserSettingsForm
 from .services import UserController
-from babel.dates import format_date, format_timedelta
 
 # locale.setlocale(locale.LC_TIME, "uk-UA.UTF-8")
 

@@ -1,16 +1,10 @@
-from typing import Any, List
-
-from django.contrib.auth.base_user import AbstractBaseUser
-from django.contrib.auth.models import AnonymousUser
-from django.db.models import QuerySet
-from django.http import Http404
-from ninja.errors import HttpError
-from ninja.security import HttpBearer
-from django.contrib.auth import get_user_model
-from ninja.security.base import AuthBase
-
-from core.models import VirtualClock
 import logging
+from typing import Any
+
+from django.contrib.auth import get_user_model
+from django.contrib.auth.base_user import AbstractBaseUser
+from ninja.errors import HttpError
+from ninja.security.base import AuthBase
 
 logger = logging.getLogger(__name__)
 

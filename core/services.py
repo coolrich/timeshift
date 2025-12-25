@@ -1,15 +1,15 @@
 from datetime import timezone, timedelta, datetime
+from logging import getLogger
 from typing import Any, Type
 
 from django.contrib.auth import get_user_model
 from django.db.models import QuerySet
-from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from ninja.errors import HttpError
 
 from accounts.models import TimeShiftUser
 from .models import VirtualClock
-from logging import getLogger
+
 User = get_user_model()
 
 logger = getLogger(__name__)
@@ -209,7 +209,7 @@ class VirtualClockController:
         """
         return self._virtual_clock.tick_enabled
 
-    def update_allowed_users(self, payload: dict) -> Type['VirtualClockController']:
+    def update_allowed_users(self, payload: dict, save: bool=True) -> Type['VirtualClockController']:
         """
         Update the list of users who have access to this virtual clock.
         
@@ -220,33 +220,39 @@ class VirtualClockController:
         
         Args:
             payload (dict): Dictionary containing update instructions.
-            
+            save (bool): automatically save to database if True
+
         Note:
             Changes are in memory only, call save() to persist to database.
         """
         # Full update of allowed users
-        if 'allowed_users' in payload:
-            self._virtual_clock.allowed_users.set(payload['allowed_users'])
+        # if 'allowed_users' in payload:
+        #     self._virtual_clock.allowed_users.set(payload['allowed_users'])
             
         # Add users to existing allowed users
-        if 'add_users' in payload and payload['add_users']:
-            self._virtual_clock.allowed_users.add(*payload['add_users'])
-            
+        # if 'add_users' in payload and payload['add_users']:
+        #     self._virtual_clock.allowed_users.add(*payload['add_users'])
+
         # Remove users from allowed users
-        if 'remove_users' in payload and payload['remove_users']:
-            self._virtual_clock.allowed_users.remove(*payload['remove_users'])
+        # if 'remove_users' in payload and payload['remove_users']:
+        #     self._virtual_clock.allowed_users.remove(*payload['remove_users'])
+
+        # Full update of allowed users
         if "allowed_users" in payload and payload["allowed_users"]:
             users = TimeShiftUser.objects.filter(id__in=payload["allowed_users"])
             self._virtual_clock.allowed_users.set(users)
 
-        # Додавання
+        # Add users to existing allowed users
         if "add_users" in payload and payload["add_users"]:
             users = TimeShiftUser.objects.filter(id__in=payload["add_users"])
             self._virtual_clock.allowed_users.add(*users)
 
-        # Видалення
+        # Removing users
         if "remove_users" in payload and payload["remove_users"]:
             users = TimeShiftUser.objects.filter(id__in=payload["remove_users"])
             self._virtual_clock.allowed_users.remove(*users)
+
+        if save:
+            self.save()
 
         return self
