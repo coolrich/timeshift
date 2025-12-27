@@ -1,0 +1,24 @@
+{% if found_user %}
+<div class="alert alert-secondary d-flex justify-content-between align-items-center">
+    <span>
+        Знайдено: <strong>{{ found_user.email }}</strong> (ID {{ found_user.id }})
+    </span>
+    <button
+            name="add_user"
+            value="add_user"
+            class="btn btn-success btn-sm"
+            hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+            hx-post="{% url 'clock_control' clock_id %}"
+            hx-vals='{"add_user_id": "{{ found_user.id }}"}'
+            hx-target="#allowed-users-table"
+            hx-swap="innerHTML"
+        >
+        Додати
+    </button>
+</div>
+<div id="result"></div>
+{% else %}
+<div class="alert alert-secondary d-flex justify-content-between align-items-center">
+    Користувача з таким ID не знайдено або доступ уже є
+</div>
+{% endif %}

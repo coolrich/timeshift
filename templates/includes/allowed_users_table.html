@@ -1,0 +1,35 @@
+<table class="table table-sm align-middle">
+    <thead>
+        <tr>
+            <th>Ім'я користувача</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for user in allowed_users %}
+        <tr>
+            <td>{{ user.username }}</td>
+            <td class="text-end">
+                <button
+                    name="remove_user"
+                    value="{{ user.username }}"
+                    class="btn btn-sm btn-outline-danger"
+                    hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                    hx-post="{% url 'clock_control' clock.id %}"
+                    hx-vals='{"remove_user_id": "{{ user.id }}"}'
+                    hx-target="#allowed-users-table"
+                    hx-swap="innerHTML"
+                >
+                    Забрати доступ
+                </button>
+            </td>
+        </tr>
+    {% empty %}
+        <tr>
+            <td colspan="2" class="text-muted">
+                Додаткових користувачів немає
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>

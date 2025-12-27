@@ -5,6 +5,29 @@
 {% block profile_content %}
 <p><strong>ID:</strong> {{ clock.id }}</p>
 
+<hr>
+<h5>Дозволені користувачі</h5>
+
+<div id="allowed-users-table" class="mt-2">
+    {% include "includes/allowed_users_table.html" %}
+</div>
+
+<label for="user_id"><strong>Додати користувачів:</strong></label>
+<input
+    type="number"
+    id="user_id"
+    name="user_id"
+    class="form-control"
+    placeholder="ID користувача"
+    min="1"
+    hx-get="{% url 'user_search_by_id' clock.id %}"
+    hx-trigger="keyup changed delay:300ms"
+    hx-target="#user-search-results"
+    autocomplete="off"
+>
+
+<div id="user-search-results" class="mt-2"></div>
+
 <form method="post" action="{% url 'clock_control' clock.id %}">
     {% csrf_token %}
     <input type="hidden" name="next" value="{{ request.get_full_path }}">
@@ -26,19 +49,18 @@
     <!-- Оновити час -->
     <label for="current_time" class="form-label">
     <strong>Оновити час</strong>
-</label>
-
+    </label>
 <div class="input-group mb-2">
     <span class="input-group-text">ISO 8601</span>
     <input
-        type="text"
+        type="datetime-local"
         name="current_time"
         id="current_time"
         class="form-control"
         placeholder="2025-11-26T04:32:15"
-        title="формат ISO 8601 (без часового поясу)"
     >
 </div>
+
 
 <button type="submit" class="btn btn-primary mt-2">Зберегти</button>
 

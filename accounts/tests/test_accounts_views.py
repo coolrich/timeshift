@@ -313,3 +313,24 @@ class UserTokenUpdateViewTest(TestCase):
         self.assertEqual(r.status_code, 302)
         self.user.refresh_from_db()
         self.assertNotEqual(old_token, self.user.api_token)
+
+class UserSearchByIdViewTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="emily",
+                                             password="verySecret123!",
+                                             email="emily@example.com",
+                                             phone_number="+380969817231")
+        self.user1 = User.objects.create_user(username="emily1",
+                                             password="rdIGn654^*fFers",
+                                             email="emily1@example.com",
+                                             phone_number="+380969817231")
+        self.client.login(username="emily", password="verySecret123!")
+        self.clock = VirtualClock.objects.create(user_owner=self.user)
+        self.url = reverse("user_search_by_id", args=[self.clock.id])
+
+    def test_user_search_by_id_view(self):
+        response = self.client.get(self.url, {"id": self.user1.id})
+        self.assertEqual(response.status_code, 200)
+        # self.assertTemplateUsed(response, "accounts/user_search_by_id.html")
+        # self.assertContains(response, self.user1.username)
+        # self.assertFalse(True)

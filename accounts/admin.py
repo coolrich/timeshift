@@ -6,7 +6,7 @@ from .models import TimeShiftUser
 
 @admin.register(TimeShiftUser)
 class TimeShiftUserAdmin(admin.ModelAdmin):
-    list_display = ('username', 'email', 'is_staff', 'is_active', 'is_superuser')
+    list_display = ('id', 'username', 'email', 'is_staff', 'is_active', 'is_superuser')
     fieldsets = UserAdmin.fieldsets + (
         ("TimeShift", {"fields": ("timezone",)}),
     )
