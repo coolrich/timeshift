@@ -1,12 +1,15 @@
 import datetime
+from http.client import responses
 from logging import getLogger
 
 import pytz
 from django.contrib.auth import get_user_model
+from django.contrib.messages import get_messages
 from django.test import TestCase
 from django.urls import reverse
 
 from core.models import VirtualClock
+from core.services import VirtualClockController
 
 logger = getLogger(__name__)
 User = get_user_model()
@@ -240,12 +243,14 @@ class ProfileSettingsViewTest(TestCase):
                                  details[0]['message'])
 
 
-class ClockStateControlViewTest(TestCase):
+class ClockControlViewTest(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="emily", password="verySecret123!")
+        self.user1 = User.objects.create_user(username="emily1", password="verySecret123!")
         self.clock = VirtualClock.objects.create(user_owner=self.user)
         self.client.login(username="emily", password="verySecret123!")
         self.url = reverse("clock_control", args=[self.clock.id])
+        self.next = reverse("clock_detail", args=[self.clock.id])
 
     def test_control_view_requires_login(self):
         self.client.logout()
@@ -253,23 +258,7 @@ class ClockStateControlViewTest(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertIn("login", response.url)
 
-    def test_control_view_post_toggles_clock(self):
-        old_state = self.clock.tick_enabled
-        response = self.client.post(self.url, data={'toggle_tick': 'toggle_tick'}, follow=True)
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(VirtualClock.objects.count(), 1)
-        self.assertNotEqual(VirtualClock.objects.first().tick_enabled, old_state)
-
-
-class ClockTimeControlViewTest(TestCase):
-    def setUp(self):
-        self.user = User.objects.create_user(username="emily", password="verySecret123!")
-        self.clock = VirtualClock.objects.create(user_owner=self.user)
-        self.client.login(username="emily", password="verySecret123!")
-        self.url = reverse("clock_control", args=[self.clock.id])
-        self.next = reverse("clock_detail", args=[self.clock.id])
-
-    def test_view_edits_time(self):
+    def test_view_edits_time_success(self):
         now = '2011-11-04 00:05:23.283'
         now_dt = datetime.datetime.strptime(now, "%Y-%m-%d %H:%M:%S.%f")
         # logger.debug(f"Current time: {now}")
@@ -285,7 +274,7 @@ class ClockTimeControlViewTest(TestCase):
         clock = VirtualClock.objects.get(pk=self.clock.pk)
         self.assertEqual(clock.current_time, tz.localize(now_dt))
 
-    def test_view_edits_time_with_invalid_time(self):
+    def test_view_edits_time_failure(self):
         now = 'invalid_time'
         response = self.client.post(self.url,
                                     {"current_time": now},
@@ -295,6 +284,86 @@ class ClockTimeControlViewTest(TestCase):
         logger.debug(f"Response: {response.content.decode()}")
         self.assertRaises(ValueError)
         self.assertContains(response, "Не вдалося встановити час. Перевірте правильність формату", status_code=400)
+
+    def test_control_view_post_toggle_tick(self):
+        old_state = self.clock.tick_enabled
+        response = self.client.post(self.url, data={'toggle_tick': 'toggle_tick'}, follow=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(VirtualClock.objects.count(), 1)
+        self.assertNotEqual(VirtualClock.objects.first().tick_enabled, old_state)
+
+    def test_control_view_post_tick_enabled(self):
+        old_state = self.clock.tick_enabled
+        response = self.client.post(self.url, data={'tick_enabled': 'on'}, follow=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(VirtualClock.objects.count(), 1)
+        self.assertNotEqual(VirtualClock.objects.first().tick_enabled, old_state)
+
+    def test_control_view_post_set_clock_name(self):
+        old_name = self.clock.name
+        response = self.client.post(self.url, data={'clock_name': 'New Clock Name'}, follow=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(VirtualClock.objects.count(), 1)
+        self.assertNotEqual(VirtualClock.objects.first().name, old_name)
+
+    def test_control_view_post_add_user_success(self):
+        response = self.client.post(self.url, data={'add_user_id': self.user1.id})
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "includes/allowed_users_table.html")
+        self.assertContains(response, self.user1.username)
+        # logger.debug(f"Response: {response.content.decode()}")
+        self.assertContains(response, f"Забрати доступ")
+        self.assertIn(self.user1, self.clock.allowed_users.all())
+        messages = list(get_messages(response.wsgi_request))
+        self.assertEqual(len(messages), 1)
+        self.assertTrue(messages)
+        self.assertEqual(messages[0].message, f"Доступ надано: {self.user1.username}")
+
+    def test_control_view_post_add_user_failure(self):
+        response = self.client.post(self.url, data={'add_user_id': self.user1.id + 1}, follow=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, self.user1.username)
+        # self.clock.refresh_from_db()
+        self.assertNotIn(self.user1, self.clock.allowed_users.all())
+        messages = list(get_messages(response.wsgi_request))
+        self.assertEqual(len(messages), 1)
+        self.assertTrue(messages)
+        self.assertEqual(messages[0].message, f"Користувача з таким ID не існує")
+
+    def test_control_view_post_add_user_already_have_access(self):
+        self.clock.allowed_users.add(self.user1)
+        response = self.client.post(self.url, data={'add_user_id': self.user1.id})
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "includes/allowed_users_table.html")
+        self.assertContains(response, self.user1.username)
+        # logger.debug(f"Response: {response.content.decode()}")
+        self.assertContains(response, f"Забрати доступ")
+        self.assertIn(self.user1, self.clock.allowed_users.all())
+        messages = list(get_messages(response.wsgi_request))
+        self.assertEqual(len(messages), 1)
+        self.assertTrue(messages)
+        self.assertEqual(messages[0].message, f"Користувач уже має доступ")
+
+    def test_control_view_post_remove_user_success(self):
+        self.clock.allowed_users.add(self.user1)
+        response = self.client.post(self.url, data={'remove_user_id': self.user1.id})
+        self.assertTemplateUsed(response, "includes/allowed_users_table.html")
+        # self.assertContains(response, self.user1.username)
+        messages = list(get_messages(response.wsgi_request))
+        self.assertEqual(len(messages), 1)
+        self.assertTrue(messages)
+        self.assertEqual(messages[0].message, f"Користувача {self.user1.username} з ID {self.user1.id} видалено")
+
+    def test_control_view_post_remove_user_failure(self):
+        self.clock.allowed_users.add(self.user1)
+        response = self.client.post(self.url, data={'remove_user_id': self.user1.id + 1})
+        logger.debug(f"Response: {response.content.decode()}")
+        self.assertTemplateUsed(response, "includes/allowed_users_table.html")
+        # self.assertContains(response, self.user1.username)
+        messages = list(get_messages(response.wsgi_request))
+        self.assertEqual(len(messages), 1)
+        self.assertTrue(messages)
+        self.assertEqual(messages[0].message, f"Користувача з таким ID не існує")
 
 
 class UserTokenUpdateViewTest(TestCase):
@@ -314,6 +383,7 @@ class UserTokenUpdateViewTest(TestCase):
         self.user.refresh_from_db()
         self.assertNotEqual(old_token, self.user.api_token)
 
+
 class UserSearchByIdViewTest(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="emily",
@@ -321,16 +391,44 @@ class UserSearchByIdViewTest(TestCase):
                                              email="emily@example.com",
                                              phone_number="+380969817231")
         self.user1 = User.objects.create_user(username="emily1",
-                                             password="rdIGn654^*fFers",
-                                             email="emily1@example.com",
-                                             phone_number="+380969817231")
+                                              password="rdIGn654^*fFers",
+                                              email="emily1@example.com",
+                                              phone_number="+380969817231")
         self.client.login(username="emily", password="verySecret123!")
         self.clock = VirtualClock.objects.create(user_owner=self.user)
         self.url = reverse("user_search_by_id", args=[self.clock.id])
 
-    def test_user_search_by_id_view(self):
-        response = self.client.get(self.url, {"id": self.user1.id})
+    def test_user_search_by_id_view_not_found(self):
+        logger.debug(f"accounts.tests.test_accounts_views."
+                     f"UserSearchByIdViewTest.test_user_search_by_id_view_not_found:"
+                     f"url: {self.url}")
+        response = self.client.get(self.url, {"user_id": self.user1.id+1},
+                                   HTTP_HX_REQUEST="true",
+                                   )
         self.assertEqual(response.status_code, 200)
-        # self.assertTemplateUsed(response, "accounts/user_search_by_id.html")
-        # self.assertContains(response, self.user1.username)
-        # self.assertFalse(True)
+        self.assertTemplateUsed(response, "includes/user_search_by_id.html")
+        logger.debug(f"accounts.tests.test_accounts_view.UserSearchByIdViewTest."
+                     f"test_user_search_by_id_view(): {response.content.decode()}")
+        self.assertNotContains(response, self.user1.username)
+        self.assertContains(response, "Користувача з таким ID не знайдено або доступ уже є")
+
+    def test_user_search_by_id_view_found(self):
+        response = self.client.get(self.url, {"user_id": self.user1.id},
+                                   HTTP_HX_REQUEST="true",
+                                   )
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "includes/user_search_by_id.html")
+        logger.debug(f"accounts.tests.test_accounts_view.UserSearchByIdViewTest."
+                     f"test_user_search_by_id_view(): {response.content.decode()}")
+        self.assertContains(response, self.user1.username)
+        self.assertContains(response, f"Знайдено: <strong>{self.user1.username}</strong> (ID {self.user1.id})")
+
+    def test_user_search_by_id_view_empty_user_id(self):
+        response = self.client.get(self.url, {"user_id": ""},
+                                   HTTP_HX_REQUEST="true",
+                                   )
+        self.assertEqual(response.status_code, 200)
+        # self.assertTemplateUsed(response, "includes/user_search_by_id.html")
+        logger.debug(f"accounts.tests.test_accounts_view.UserSearchByIdViewTest."
+                     f"test_user_search_by_id_view(): {response.content.decode()}")
+        self.assertContains(response, "")

@@ -6,12 +6,6 @@
 <p><strong>ID:</strong> {{ clock.id }}</p>
 
 <hr>
-<h5>Дозволені користувачі</h5>
-
-<div id="allowed-users-table" class="mt-2">
-    {% include "includes/allowed_users_table.html" %}
-</div>
-
 <label for="user_id"><strong>Додати користувачів:</strong></label>
 <input
     type="number"
@@ -21,12 +15,20 @@
     placeholder="ID користувача"
     min="1"
     hx-get="{% url 'user_search_by_id' clock.id %}"
-    hx-trigger="keyup changed delay:300ms"
+    hx-trigger="keyup delay:300ms"
     hx-target="#user-search-results"
     autocomplete="off"
 >
 
-<div id="user-search-results" class="mt-2"></div>
+<div id="user-search-results" class="mt-2"
+     hx-on="htmx:afterRequest:document.getElementById('user_id').value = ''"
+></div>
+
+<h5>Дозволені користувачі</h5>
+
+<div id="allowed-users-table" class="mt-2">
+    {% include "includes/allowed_users_table.html" %}
+</div>
 
 <form method="post" action="{% url 'clock_control' clock.id %}">
     {% csrf_token %}

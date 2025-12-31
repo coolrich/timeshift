@@ -1,7 +1,7 @@
 {% if found_user %}
 <div class="alert alert-secondary d-flex justify-content-between align-items-center">
     <span>
-        Знайдено: <strong>{{ found_user.email }}</strong> (ID {{ found_user.id }})
+        Знайдено: <strong>{{ found_user.username }}</strong> (ID {{ found_user.id }})
     </span>
     <button
             name="add_user"
@@ -12,13 +12,15 @@
             hx-vals='{"add_user_id": "{{ found_user.id }}"}'
             hx-target="#allowed-users-table"
             hx-swap="innerHTML"
+            hx-on="htmx:afterRequest:
+        document.getElementById('user-search-results').innerHTML = ''"
         >
         Додати
     </button>
 </div>
 <div id="result"></div>
 {% else %}
-<div class="alert alert-secondary d-flex justify-content-between align-items-center">
-    Користувача з таким ID не знайдено або доступ уже є
-</div>
+    <div class="alert alert-secondary d-flex justify-content-between align-items-center">
+        Користувача з таким ID не знайдено або доступ уже є
+    </div>
 {% endif %}
