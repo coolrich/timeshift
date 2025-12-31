@@ -384,7 +384,7 @@ class UserTokenUpdateViewTest(TestCase):
         self.assertNotEqual(old_token, self.user.api_token)
 
 
-class UserSearchByIdViewTest(TestCase):
+class UserSearchViewTest(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="emily",
                                              password="verySecret123!",
@@ -398,7 +398,7 @@ class UserSearchByIdViewTest(TestCase):
         self.clock = VirtualClock.objects.create(user_owner=self.user)
         self.url = reverse("user_search_by_id", args=[self.clock.id])
 
-    def test_user_search_by_id_view_not_found(self):
+    def test_user_search_view_not_found_by_id(self):
         logger.debug(f"accounts.tests.test_accounts_views."
                      f"UserSearchByIdViewTest.test_user_search_by_id_view_not_found:"
                      f"url: {self.url}")
@@ -412,7 +412,7 @@ class UserSearchByIdViewTest(TestCase):
         self.assertNotContains(response, self.user1.username)
         self.assertContains(response, "Користувача з таким ID не знайдено або доступ уже є")
 
-    def test_user_search_by_id_view_found(self):
+    def test_user_search_view_found_by_id(self):
         response = self.client.get(self.url, {"user_id": self.user1.id},
                                    HTTP_HX_REQUEST="true",
                                    )
@@ -423,7 +423,7 @@ class UserSearchByIdViewTest(TestCase):
         self.assertContains(response, self.user1.username)
         self.assertContains(response, f"Знайдено: <strong>{self.user1.username}</strong> (ID {self.user1.id})")
 
-    def test_user_search_by_id_view_empty_user_id(self):
+    def test_user_search_view_empty_search_field(self):
         response = self.client.get(self.url, {"user_id": ""},
                                    HTTP_HX_REQUEST="true",
                                    )
@@ -432,3 +432,28 @@ class UserSearchByIdViewTest(TestCase):
         logger.debug(f"accounts.tests.test_accounts_view.UserSearchByIdViewTest."
                      f"test_user_search_by_id_view(): {response.content.decode()}")
         self.assertContains(response, "")
+
+    def test_user_search_view_not_found_by_name(self):
+        logger.debug(f"accounts.tests.test_accounts_views."
+                     f"UserSearchByIdViewTest.test_user_search_by_id_view_not_found:"
+                     f"url: {self.url}")
+        response = self.client.get(self.url, {"user_id": self.user1.username + "1"},
+                                   HTTP_HX_REQUEST="true",
+                                   )
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "includes/user_search_by_id.html")
+        logger.debug(f"accounts.tests.test_accounts_view.UserSearchByIdViewTest."
+                     f"test_user_search_by_id_view(): {response.content.decode()}")
+        self.assertNotContains(response, self.user1.username)
+        self.assertContains(response, "Користувача з таким ID не знайдено або доступ уже є")
+
+    def test_user_search_view_found_by_name(self):
+        response = self.client.get(self.url, {"user_id": self.user1.username},
+                                   HTTP_HX_REQUEST="true",
+                                   )
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "includes/user_search_by_id.html")
+        logger.debug(f"accounts.tests.test_accounts_view.UserSearchByIdViewTest."
+                     f"test_user_search_by_id_view(): {response.content.decode()}")
+        self.assertContains(response, self.user1.username)
+        self.assertContains(response, f"Знайдено: <strong>{self.user1.username}</strong> (ID {self.user1.id})")

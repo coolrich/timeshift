@@ -8,12 +8,11 @@
 <hr>
 <label for="user_id"><strong>Додати користувачів:</strong></label>
 <input
-    type="number"
+    type="text"
     id="user_id"
     name="user_id"
     class="form-control"
-    placeholder="ID користувача"
-    min="1"
+    placeholder="ID або нікнейм користувача"
     hx-get="{% url 'user_search_by_id' clock.id %}"
     hx-trigger="keyup delay:300ms"
     hx-target="#user-search-results"

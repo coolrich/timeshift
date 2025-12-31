@@ -1,4 +1,5 @@
 import datetime
+import re
 from logging import getLogger
 
 import pytz
@@ -247,7 +248,8 @@ class ClockControlView(LoginRequiredMixin, View):
                 # )
             elif clock.allowed_users.filter(id=user.id).exists():
                 m = "Користувач уже має доступ"
-                logger.debug(f"ClockControlView.post(): add_user ID: {add_user_id}: користувач з таким ID вже має доступ")
+                logger.debug(
+                    f"ClockControlView.post(): add_user ID: {add_user_id}: користувач з таким ID вже має доступ")
                 messages_to_user.append(m)
                 messages.info(request, m)
                 # return HttpResponse(
@@ -258,7 +260,7 @@ class ClockControlView(LoginRequiredMixin, View):
                 logger.debug(f"ClockControlView.post(): add_user ID: {add_user_id}: "
                              f"надано доступ користувачу {user.username}")
                 messages_to_user.append(m)
-                controller.update_allowed_users({'add_users':[add_user_id]})
+                controller.update_allowed_users({'add_users': [add_user_id]})
                 messages.success(request, m)
             return render(
                 request,
@@ -305,35 +307,55 @@ class ClockControlView(LoginRequiredMixin, View):
         return redirect(next_url)
 
 
-class UserSearchByIdView(LoginRequiredMixin, View):
+class UserSearchView(LoginRequiredMixin, View):
+    USERNAME_RE = r'^[\w.@+-]+$'
+
+    @staticmethod
+    def is_valid_username(value: str) -> bool:
+        return bool(re.fullmatch(UserSearchView.USERNAME_RE, value))
 
     def get(self, request, clock_id):
         logger.debug(f"core.views.UserSearchByIdView.get(): start")
-        raw_user_id = request.GET.get("user_id", "").strip()
-        logger.debug(f"core.views.UserSearchByIdView.get(): clock_id:{clock_id} raw_user_id:{raw_user_id}")
+        raw_user_input = request.GET.get("user_id", "").strip()
+        logger.debug(f"core.views.UserSearchByIdView.get(): clock_id:{clock_id} raw_user_id:{raw_user_input}")
 
-        if str(raw_user_id) == "":
+        if str(raw_user_input) == "":
+            logger.debug(f"core.views.UserSearchByIdView.get(): empty input")
             return HttpResponse()
-
-        if not raw_user_id.isdigit():
+        elif raw_user_input.isdigit():
+            user_id = int(raw_user_input)
+            logger.debug(f"core.views.UserSearchByIdView.get(): looking for user id:{user_id}")
+            user = (
+                User.objects
+                .filter(id=user_id)
+                .exclude(virtual_clocks__id=clock_id).exclude(shared_clocks__id=clock_id)
+                .first()
+            )
+            logger.debug(f"core.views.UserSearchByIdView.get(): user: {user}")
+            return render(
+                request,
+                "includes/user_search_by_id.html",
+                {'found_user': user, 'clock_id': clock_id}
+            )
+        elif self.is_valid_username(raw_user_input):
+            username = raw_user_input
+            logger.debug(f"core.views.UserSearchByIdView.get(): looking for user id:{username}")
+            user = (
+                User.objects
+                .filter(username=username)
+                .exclude(virtual_clocks__id=clock_id).exclude(shared_clocks__id=clock_id)
+                .first()
+            )
+            logger.debug(f"core.views.UserSearchByIdView.get(): looking for user id:{"Found" if user else "Not Found"}")
+            return render(
+                request,
+                "includes/user_search_by_id.html",
+                {'found_user': user, 'clock_id': clock_id}
+            )
+        else:
+            logger.debug(f"core.views.UserSearchByIdView.get(): not valid input")
             return render(
                 request,
                 "includes/user_search_by_id.html",
                 {'found_user': ""}
             )
-
-        user_id = int(raw_user_id)
-        logger.debug(f"core.views.UserSearchByIdView.get(): looking for user id:{user_id}")
-
-        user = (
-            User.objects
-            .filter(id=user_id)
-            .exclude(virtual_clocks__id=clock_id).exclude(shared_clocks__id=clock_id)
-            .first()
-        )
-        logger.debug(f"core.views.UserSearchByIdView.get(): user: {user}")
-        return render(
-            request,
-            "includes/user_search_by_id.html",
-            {'found_user': user, 'clock_id': clock_id}
-        )
