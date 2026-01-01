@@ -233,6 +233,11 @@ class ClockControlView(LoginRequiredMixin, View):
             controller.toggle_tick()
             state = "увімкнено" if controller.tick_status else "вимкнено"
             messages_to_user.append(f"Тікання годинника {state}")
+            return render(
+                request,
+                "includes/clock_item.html",
+                {"clock": clock}
+            )
 
         # --- Час ---
         current_time = request.POST.get("current_time")
