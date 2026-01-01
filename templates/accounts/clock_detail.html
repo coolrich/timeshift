@@ -6,6 +6,7 @@
 <p><strong>ID:</strong> {{ clock.id }}</p>
 
 <hr>
+{% if requested_user == user_owner %}
 <label for="user_id"><strong>Додати користувачів:</strong></label>
 <input
     type="text"
@@ -28,7 +29,7 @@
 <div id="allowed-users-table" class="mt-2">
     {% include "includes/allowed_users_table.html" %}
 </div>
-
+{% endif %}
 <form method="post" action="{% url 'clock_control' clock.id %}">
     {% csrf_token %}
     <input type="hidden" name="next" value="{{ request.get_full_path }}">

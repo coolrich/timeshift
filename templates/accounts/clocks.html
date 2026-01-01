@@ -2,57 +2,137 @@
 {% block title %}Мої годинники – {{ ENV_SITE_NAME }}{% endblock %}
 
 {% block profile_content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-  <h2 class="mb-0">Мої віртуальні годинники</h2>
-  <a href="{% url 'clock_create' %}" class="btn btn-primary">➕ Створити годинник</a>
+
+{# ===== МОЇ ГОДИННИКИ ===== #}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2 class="mb-0">Мої віртуальні годинники ({{ user.virtual_clocks.count }})</h2>
+  <div class="d-flex gap-2">
+    <a href="{% url 'clock_create' %}"
+       class="btn btn-sm btn-primary"
+       title="Створити новий віртуальний годинник">
+      ➕ Створити
+    </a>
+    <button class="btn btn-sm btn-outline-secondary"
+            data-bs-toggle="collapse"
+            data-bs-target="#myClocks"
+            title="Згорнути або розгорнути список моїх годинників"
+            aria-label="Згорнути або розгорнути список моїх годинників">
+      ⬍
+    </button>
+
+  </div>
 </div>
 
+<div id="myClocks" class="collapse show">
 {% if user.virtual_clocks.exists %}
-  <div class="list-group shadow-sm">
+  <div class="list-group shadow-sm mb-4">
     {% for clock in user.virtual_clocks.all %}
-  <div class="list-group-item d-flex justify-content-between align-items-center">
-    <div>
-      <h5 class="mb-0">
-        <a href="{% url 'clock_detail' clock.id %}" class="text-decoration-none">
-          {{ clock.name }}
-        </a>
-      </h5>
-      <small class="text-muted">ID: {{ clock.id }}</small>
-    </div>
+      <div class="list-group-item d-flex justify-content-between align-items-center">
+        <div class="me-3">
+          <h5 class="mb-0">
+            <a href="{% url 'clock_detail' clock.id %}" class="text-decoration-none">
+              {{ clock.name }}
+            </a>
+          </h5>
+          <small class="text-muted">ID: {{ clock.id }}</small>
+        </div>
 
-    <div class="d-flex align-items-center">
-      <span class="badge bg-primary rounded-pill me-3">
-        {{ clock.tick_enabled|yesno:"активний,вимкнений" }}
-      </span>
-      <form method="post" action="{% url 'clock_control' clock.id %}">
-        {% csrf_token %}
-        <input type="hidden" name="next" value="{{ request.get_full_path }}">
-        <input type="hidden" name="toggle_tick" value="toggle_tick">
-        <button type="submit" class="btn btn-sm btn-outline-primary">
-        {% if clock.tick_enabled %}
-            ⏸
-        {% else %}
-            ▶
-        {% endif %}
-        </button>
-    </form>
-      <a href="{% url 'clock_delete' clock.id %}" class="btn btn-sm btn-outline-danger">🗑️</a>
-    </div>
-  </div>
-{% endfor %}
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge bg-primary rounded-pill"
+                title="Стан роботи годинника">
+            {{ clock.tick_enabled|yesno:"активний,вимкнений" }}
+          </span>
 
-<!--{% if messages %}-->
-<!--  {% for message in messages %}-->
-<!--    <div class="alert alert-info alert-dismissible fade show" role="alert">-->
-<!--      {{ message }}-->
-<!--      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>-->
-<!--    </div>-->
-<!--  {% endfor %}-->
-<!--{% endif %}-->
+          <form method="post"
+                action="{% url 'clock_control' clock.id %}"
+                class="d-inline">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <input type="hidden" name="toggle_tick" value="toggle_tick">
+            <button type="submit"
+                    class="btn btn-sm btn-outline-primary"
+                    title="{% if clock.tick_enabled %}Поставити на паузу{% else %}Запустити годинник{% endif %}">
+              {% if clock.tick_enabled %}⏸{% else %}▶{% endif %}
+            </button>
+          </form>
 
-
+          <a href="{% url 'clock_delete' clock.id %}"
+             class="btn btn-sm btn-outline-danger"
+             title="Видалити годинник">
+            🗑️
+          </a>
+        </div>
+      </div>
+    {% endfor %}
   </div>
 {% else %}
-  <p class="text-muted">Ще не створено жодного годинника.</p>
+  <div class="alert alert-light text-muted">
+    Ще не створено жодного годинника.
+  </div>
 {% endif %}
+</div>
+
+{# ===== ГОДИННИКИ ІНШИХ КОРИСТУВАЧІВ ===== #}
+<div class="d-flex justify-content-between align-items-center mt-4 mb-3">
+  <h2 class="mb-0">Годинники інших користувачів ({{shared_count}})</h2>
+  <button class="btn btn-sm btn-outline-secondary"
+          data-bs-toggle="collapse"
+          data-bs-target="#sharedClocks"
+          title="Показати або приховати годинники інших користувачів"
+          aria-label="Показати або приховати годинники інших користувачів">
+    ⬍
+  </button>
+</div>
+
+<div id="sharedClocks" class="collapse show">
+{% if shared_clocks %}
+  {% for owner, clocks in shared_clocks.items %}
+    <div class="mb-4">
+      <h5 class="text mb-2">
+        Користувач: <strong>{{ owner.username }} ({{clocks|length}})</strong>
+      </h5>
+
+      <div class="list-group shadow-sm">
+        {% for clock in clocks %}
+          <div class="list-group-item d-flex justify-content-between align-items-center">
+            <div class="me-3">
+              <h5 class="mb-0">
+                <a href="{% url 'clock_detail' clock.id %}" class="text-decoration-none">
+                  {{ clock.name }}
+                </a>
+              </h5>
+              <small class="text-muted">ID: {{ clock.id }}</small>
+            </div>
+
+            <div class="d-flex align-items-center gap-2">
+              <span class="badge bg-primary rounded-pill"
+                    title="Стан роботи годинника">
+                {{ clock.tick_enabled|yesno:"активний,вимкнений" }}
+              </span>
+
+              <form method="post"
+                    action="{% url 'clock_control' clock.id %}"
+                    class="d-inline">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <input type="hidden" name="toggle_tick" value="toggle_tick">
+                <button type="submit"
+                        class="btn btn-sm btn-outline-primary"
+                        title="{% if clock.tick_enabled %}Поставити на паузу{% else %}Запустити годинник{% endif %}">
+                  {% if clock.tick_enabled %}⏸{% else %}▶{% endif %}
+                </button>
+              </form>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endfor %}
+{% else %}
+  <div class="alert alert-light text-muted">
+    Немає годинників від інших користувачів
+  </div>
+{% endif %}
+</div>
+
 {% endblock %}

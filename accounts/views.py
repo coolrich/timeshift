@@ -1,5 +1,6 @@
 import datetime
 import re
+from collections import defaultdict
 from logging import getLogger
 
 import pytz
@@ -9,6 +10,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth import login
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import IntegrityError
+from django.db.models import Q
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy, reverse
@@ -77,13 +79,24 @@ class ProfileClocksView(LoginRequiredMixin, ListView):
     fields = ["tick_enabled"]
     context_object_name = "clocks"
 
-    def get_queryset(self):
-        return self.request.user.virtual_clocks.all()
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
 
-    # def get_context_data(self, **kwargs):
-    #     context = super().get_context_data(**kwargs)
-    #     context["form"] = self.form_class()
-    #     return context
+        grouped = defaultdict(list)
+
+        clocks = (
+            self.get_queryset()
+            .select_related("user_owner")
+        )
+
+        for clock in clocks:
+            if clock.user_owner != self.request.user:
+                grouped[clock.user_owner].append(clock)
+        shared_count = sum(len(clocks) for clocks in grouped.values())
+        context["shared_count"] = shared_count
+        context["shared_clocks"] = dict(grouped)
+        logger.debug(f"ProfileClocksView.get_context_data(): shared_count: {shared_count}")
+        return context
 
 
 class ClockDetailView(LoginRequiredMixin, DetailView):
@@ -96,7 +109,10 @@ class ClockDetailView(LoginRequiredMixin, DetailView):
 
     def get_queryset(self):
         # тільки годинники користувача
-        return self.request.user.virtual_clocks.all()
+        return VirtualClock.objects.filter(
+            Q(user_owner=self.request.user) |
+            Q(allowed_users=self.request.user)
+        ).distinct()
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -104,6 +120,8 @@ class ClockDetailView(LoginRequiredMixin, DetailView):
         vcc = VirtualClockController(self.object)
         context["current_time"] = vcc.get_time()
         context["allowed_users"] = vcc.virtual_clock.allowed_users.all()
+        context["requested_user"] = self.request.user
+        context["user_owner"] = vcc.get_user_owner()
         # context['tick_enabled'] = vcc.tick_status
         user_tz = self.request.user.timezone
         dj_tz.activate(user_tz)
@@ -179,16 +197,21 @@ class UserTokenUpdateView(LoginRequiredMixin, View):
 
 class ClockControlView(LoginRequiredMixin, View):
     def get_queryset(self):
-        return self.request.user.virtual_clocks.all()
+        return VirtualClock.objects.filter(
+            Q(user_owner=self.request.user) |
+            Q(allowed_users=self.request.user)
+        ).distinct()
 
     def post(self, request, *args, **kwargs):
         logger.debug(f"accounts.views.ClockControlView.post()")
         pk = kwargs.get("pk")
         clock = get_object_or_404(self.get_queryset(), pk=pk)
         controller: VirtualClockController = VirtualClockController(clock)
+
         context = {"clock": clock,
                    "current_time": controller.get_time(),
-                   "allowed_users": clock.allowed_users.all()}
+                   "allowed_users": clock.allowed_users.all(),
+                   }
         messages_to_user = []
 
         # --- Назва ---
@@ -234,61 +257,61 @@ class ClockControlView(LoginRequiredMixin, View):
                     status=400,
                 )
 
-        # add_user = request.POST.get("add_user")
-        add_user_id = request.POST.get("add_user_id")
-        if add_user_id:
-            user = User.objects.filter(id=add_user_id).first()
-            if not user:
-                m = "Користувача з таким ID не існує"
-                messages_to_user.append(m)
-                messages.error(request, m)
-                logger.debug(f"ClockControlView.post(): add_user ID: {add_user_id}: користувача з таким ID не існує")
-                # return HttpResponse(
-                #     f"<div class='alert alert-info alert-dismissible fade show'>Юзер {user.id} не існує</div>"
-                # )
-            elif clock.allowed_users.filter(id=user.id).exists():
-                m = "Користувач уже має доступ"
-                logger.debug(
-                    f"ClockControlView.post(): add_user ID: {add_user_id}: користувач з таким ID вже має доступ")
-                messages_to_user.append(m)
-                messages.info(request, m)
-                # return HttpResponse(
-                #     f"<div class='alert alert-info alert-dismissible fade show'>Юзер {user.id} вже має доступ</div>"
-                # )
-            else:
-                m = f"Доступ надано: {user.username}"
-                logger.debug(f"ClockControlView.post(): add_user ID: {add_user_id}: "
-                             f"надано доступ користувачу {user.username}")
-                messages_to_user.append(m)
-                controller.update_allowed_users({'add_users': [add_user_id]})
-                messages.success(request, m)
-            return render(
-                request,
-                "includes/allowed_users_table.html",
-                context,
-            )
+        if self.request.user == clock.user_owner:
+            add_user_id = request.POST.get("add_user_id")
+            if add_user_id:
+                user = User.objects.filter(id=add_user_id).first()
+                if not user:
+                    m = "Користувача з таким ID не існує"
+                    messages_to_user.append(m)
+                    messages.error(request, m)
+                    logger.debug(f"ClockControlView.post(): add_user ID: {add_user_id}: користувача з таким ID не існує")
+                    # return HttpResponse(
+                    #     f"<div class='alert alert-info alert-dismissible fade show'>Юзер {user.id} не існує</div>"
+                    # )
+                elif clock.allowed_users.filter(id=user.id).exists():
+                    m = "Користувач уже має доступ"
+                    logger.debug(
+                        f"ClockControlView.post(): add_user ID: {add_user_id}: користувач з таким ID вже має доступ")
+                    messages_to_user.append(m)
+                    messages.info(request, m)
+                    # return HttpResponse(
+                    #     f"<div class='alert alert-info alert-dismissible fade show'>Юзер {user.id} вже має доступ</div>"
+                    # )
+                else:
+                    m = f"Доступ надано: {user.username}"
+                    logger.debug(f"ClockControlView.post(): add_user ID: {add_user_id}: "
+                                 f"надано доступ користувачу {user.username}")
+                    messages_to_user.append(m)
+                    controller.update_allowed_users({'add_users': [add_user_id]})
+                    messages.success(request, m)
+                return render(
+                    request,
+                    "includes/allowed_users_table.html",
+                    context,
+                )
 
-        remove_user_id = request.POST.get("remove_user_id")
-        if remove_user_id:
-            remove_user = User.objects.filter(id=remove_user_id).first()
-            if remove_user:
-                username = remove_user.username
-                logger.debug(f"ClockControlView.post(): remove user:"
-                             f" username {username} ID {remove_user_id}")
-                controller.update_allowed_users({'remove_users': [remove_user_id]})
-                m = f"Користувача {username} з ID {remove_user_id} видалено"
-                messages_to_user.append(m)
-                messages.error(request, m)
-            else:
-                m = "Користувача з таким ID не існує"
-                messages_to_user.append(m)
-                messages.error(request, m)
-                logger.debug(f"ClockControlView.post(): add_user ID: {add_user_id}: користувача з таким ID не існує")
-            return render(
-                request,
-                "includes/allowed_users_table.html",
-                context
-            )
+            remove_user_id = request.POST.get("remove_user_id")
+            if remove_user_id:
+                remove_user = User.objects.filter(id=remove_user_id).first()
+                if remove_user:
+                    username = remove_user.username
+                    logger.debug(f"ClockControlView.post(): remove user:"
+                                 f" username {username} ID {remove_user_id}")
+                    controller.update_allowed_users({'remove_users': [remove_user_id]})
+                    m = f"Користувача {username} з ID {remove_user_id} видалено"
+                    messages_to_user.append(m)
+                    messages.error(request, m)
+                else:
+                    m = "Користувача з таким ID не існує"
+                    messages_to_user.append(m)
+                    messages.error(request, m)
+                    logger.debug(f"ClockControlView.post(): add_user ID: {add_user_id}: користувача з таким ID не існує")
+                return render(
+                    request,
+                    "includes/allowed_users_table.html",
+                    context
+                )
 
             # --- Відправка повідомлень ---
         for msg in messages_to_user:
