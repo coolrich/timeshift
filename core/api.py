@@ -188,6 +188,7 @@ def retrieve_clock(request, clock_id: int):
         user_owner_id=controller.get_user_owner().id,
         name=controller.virtual_clock.name,
         time=controller.get_iso_time(),
+        speed=controller.get_clock_speed(),
         allowed_users=list(controller.virtual_clock.allowed_users.values_list("id", flat=True)),
         tick_enabled=controller.tick_status
     )
@@ -216,6 +217,7 @@ def list_clocks(request):
                 user_owner_id=owner.id,
                 name=clock.name,
                 time=controller.get_iso_time(),
+                speed=controller.get_clock_speed(),
                 allowed_users=allowed_users,
                 tick_enabled=controller.tick_status,
             ))
@@ -225,6 +227,7 @@ def list_clocks(request):
                 user_owner_id=owner.id,
                 name=clock.name,
                 time=controller.get_iso_time(),
+                speed=controller.get_clock_speed(),
                 tick_enabled=controller.tick_status,
             ))
 
@@ -247,20 +250,26 @@ def update_clock(request, payload: ClockUpdateRequest):
     changed_fields = []
 
     # 1) Оновлення часу
-    if payload_dict.get("time") is not None:
+    if payload_dict.get("time"):
         is_valid, new_time = TimeService.validate_time_format(payload_dict["time"])
         if not is_valid:
             raise HttpError(400, "Invalid time format")
         controller.set_time(new_time, save=False)
         changed_fields.append("time")
 
+    if payload_dict.get("speed"):
+        new_speed = payload_dict.get("speed")
+        controller.set_clock_speed(new_speed, save=False)
+        changed_fields.append("speed")
+
+
     # 2) Оновлення tick
-    if payload_dict.get("tick_enabled") is not None:
+    if payload_dict.get("tick_enabled"):
         controller.toggle_tick(payload_dict["tick_enabled"], save=False)
         changed_fields.append("tick_enabled")
 
     # 3) Оновлення імені
-    if payload_dict.get("name") is not None:
+    if payload_dict.get("name"):
         name = (payload_dict["name"] or "").strip()
         controller.set_clock_name(name, save=False)
         changed_fields.append("name")
@@ -268,13 +277,13 @@ def update_clock(request, payload: ClockUpdateRequest):
     relevant_keys = {"allowed_users", "add_users", "remove_users"}
     keys = relevant_keys & payload_dict.keys()
     logger.info(f"core.api.update_clock(): keys: {keys}")
-    keys_set = {k for k in keys if payload_dict[k] is not None}
+    keys_set = {k for k in keys if payload_dict[k]}
     if relevant_keys & keys_set:
         # 4) редагування allowed_users
         if clock.user_owner != user:
             logger.info(f"User {user.username} is not the owner of clock {clock.id}")
             return 403, ErrorClockResponse(status="error", detail="Permission denied")
-        filtered_payload = {k: v for k, v in payload_dict.items() if k in relevant_keys and v is not None}
+        filtered_payload = {k: v for k, v in payload_dict.items() if k in relevant_keys and v}
         controller.update_allowed_users(filtered_payload, save=False)
         changed_fields.append("allowed_users")
 
@@ -284,6 +293,7 @@ def update_clock(request, payload: ClockUpdateRequest):
         clock_id=clock.id,
         name=clock.name if "name" in changed_fields else None,
         time=controller.get_iso_time() if "time" in changed_fields else None,
+        speed=controller.get_clock_speed() if "speed" in changed_fields else None,
         tick_enabled=controller.tick_status if "tick_enabled" in changed_fields else None,
         allowed_users=list(
             clock.allowed_users.values_list("id", flat=True)) if "allowed_users" in changed_fields else None,

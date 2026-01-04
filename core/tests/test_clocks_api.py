@@ -1,4 +1,7 @@
+import logging
+
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.test import TestCase
 from ninja.testing import TestClient
 
@@ -7,7 +10,7 @@ from core.models import VirtualClock
 
 User = get_user_model()
 client = TestClient(router)
-
+logger = logging.getLogger(__name__)
 
 class ClockTests(TestCase):
 
@@ -15,7 +18,9 @@ class ClockTests(TestCase):
         self.user = User.objects.create_user(username="emily",
                                              password="emilypass",
                                              email="emily@example.com",
-                                             phone_number="+380969817231")
+                                             phone_number="+380969817231",
+                                             max_clocks_count=10)
+        # self.clock = VirtualClock.objects.create(user_owner=self.user, name="TestClock1")
 
     def test_create_clock_with_payload(self):
         payload = {"name": "MyClock"}
@@ -82,13 +87,24 @@ class ClockTests(TestCase):
         names = [c["name"] for c in data]
         self.assertSetEqual(set(names), {"Clock A", "Clock B"})
 
-    def test_update_clock_name_and_tick(self):
+    def test_speed_min_max_vals(self):
+        self.clock = VirtualClock.objects.create(user_owner=self.user, name="TestClock")
+        validators = self.clock._meta.get_field("speed").validators
+        logger.debug(f"core.tests.test_clocks_api.py: test_speed_min_max_vals(): min_validator: "
+                     f"{validators[0].limit_value}")
+        logger.debug(f"core.tests.test_clocks_api.py: test_speed_min_max_vals(): max_validator: "
+                     f"{validators[1].limit_value}")
+        self.assertEqual(validators[0].limit_value, 0.01)
+        self.assertEqual(validators[1].limit_value, 100.0)
+
+    def test_update_clock_name_tick_speed(self):
         user = self.user
         clock = VirtualClock.objects.create(user_owner=user, name="Old Name", tick_enabled=False)
         payload = {
             "clock_id": clock.id,
             "name": "New Name",
             "tick_enabled": True,
+            "speed": 2
         }
 
         response = client.put("/clocks/", json=payload, headers={"Authorization": f"bearer {str(user.api_token)}"})
@@ -100,6 +116,16 @@ class ClockTests(TestCase):
         clock.refresh_from_db()
         self.assertEqual(clock.name, "New Name")
         self.assertTrue(clock.tick_enabled)
+        self.assertEqual(clock.speed, 2)
+
+    def test_update_clock_nonvalid_speed(self):
+        clock = VirtualClock.objects.create(user_owner=self.user, name="TestClock")
+        validators = clock._meta.get_field("speed").validators
+        with self.assertRaises(ValidationError):
+            response = client.put("/clocks/", json={"clock_id": clock.id, "speed": validators[1].limit_value + 1},
+                                  headers={"Authorization": f"bearer {str(self.user.api_token)}"})
+            logger.debug(f"core.tests.test_clocks_api.py: test_update_clock_nonvalid_speed(): response: {response}")
+            response.raise_for_status()
 
     def test_update_clock_denied_for_non_owner(self):
         owner = self.user

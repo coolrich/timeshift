@@ -1,7 +1,7 @@
 <button
     class="btn btn-sm btn-outline-primary"
     hx-post="{% url 'clock_control' clock.id %}"
-    hx-vals='{"toggle_tick":"toggle_tick"}'
+    hx-vals='{"toggle_tick":"button"}'
     hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
     hx-target="#clock-{{ clock.id }}"
     hx-swap="innerHTML"

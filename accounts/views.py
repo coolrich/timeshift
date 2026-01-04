@@ -11,7 +11,7 @@ from django.contrib.auth import login
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import IntegrityError
 from django.db.models import Q
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy, reverse
 from django.utils import timezone as dj_tz
@@ -79,6 +79,12 @@ class ProfileClocksView(LoginRequiredMixin, ListView):
     fields = ["tick_enabled"]
     context_object_name = "clocks"
 
+    def get_queryset(self):
+        return VirtualClock.objects.filter(
+            Q(user_owner=self.request.user) |
+            Q(allowed_users=self.request.user)
+        ).distinct()
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
@@ -103,7 +109,7 @@ class ClockDetailView(LoginRequiredMixin, DetailView):
     model = VirtualClock
     template_name = "accounts/clock_detail.html"
     context_object_name = "clock"
-    fields = ["current_time", "tick_enabled"]
+    fields = ["current_time", "tick_enabled", "speed"]
 
     # form_class = VirtualClockForm
 
@@ -143,7 +149,7 @@ class ClockCreateView(LoginRequiredMixin, CreateView):
             return super().form_valid(form)
         except IntegrityError as e:
             logger.error(f"ClockCreateView.form_valid(): IntegrityError: {e}")
-            messages.error(self.request, "Не вдалося створити годинник. Перевищено ліміт годинників.")
+            messages.warning(self.request, "Не вдалося створити годинник. Перевищено ліміт годинників.")
             return redirect("profile_clocks")
 
 
@@ -202,12 +208,33 @@ class ClockControlView(LoginRequiredMixin, View):
             Q(allowed_users=self.request.user)
         ).distinct()
 
+    def get(self, request, *args, **kwargs):
+        # clock_id = kwargs[]
+        # logger.debug(f"accounts.views.ClockControlView.get(): kwargs:{kwargs}")
+        # logger.debug(f"accounts.views.ClockControlView.get(): clock_id: {clock_id}")
+        clock = get_object_or_404(VirtualClock, id=kwargs['pk'])
+        controller = VirtualClockController(clock)
+        current_time = controller.get_iso_time()
+        logger.debug(f"accounts.views.ClockControlView.get(): current_time: {current_time}")
+        return JsonResponse({
+            "current_time": current_time,
+            "timezone": controller.get_time_zone()
+        })
+
     def post(self, request, *args, **kwargs):
         logger.debug(f"accounts.views.ClockControlView.post()")
+        logger.debug(f"accounts.views.ClockControlView.post(): POST params: {request.POST}")
         pk = kwargs.get("pk")
         clock = get_object_or_404(self.get_queryset(), pk=pk)
         controller: VirtualClockController = VirtualClockController(clock)
+        if request.headers.get("HX-Request"):
+            # Запит прийшов від HTMX
+            is_htmx = True
+        else:
+            # Звичайний POST, не через HTMX
+            is_htmx = False
 
+        logger.debug(f"accounts.views.ClockControlView.post(): is_htmx: {is_htmx}")
         context = {"clock": clock,
                    "current_time": controller.get_time(),
                    "allowed_users": clock.allowed_users.all(),
@@ -221,23 +248,31 @@ class ClockControlView(LoginRequiredMixin, View):
             messages_to_user.append(f"Назва годинника змінена на {name}")
 
         # --- Тікання ---
-        element = request.POST.get("tick_enabled")
-        tick_enabled = element == "on"
-        if element and tick_enabled != controller.tick_status:
-            logger.debug(f"ClockControlView.post(): if tick_enabled != controller.tick_status")
-            controller.toggle_tick(save=False)  # або окремий метод set_tick(tick_enabled)
-            state = "увімкнено" if tick_enabled else "вимкнено"
-            messages_to_user.append(f"Тікання годинника {state}")
-        if request.POST.get('toggle_tick'):
-            logger.debug(f"ClockControlView.post(): if request.POST.get('toggle_tick')")
-            controller.toggle_tick()
-            state = "увімкнено" if controller.tick_status else "вимкнено"
-            messages_to_user.append(f"Тікання годинника {state}")
-            return render(
-                request,
-                "includes/clock_item.html",
-                {"clock": clock}
-            )
+        element = request.POST.get("toggle_tick")
+        logger.debug(f"ClockControlView.post(): element: {element}")
+        if not is_htmx:
+            logger.debug(f"ClockControlView.post(): if tick_enabled != controller.tick_status not htmx")
+            if element == "checkbox":
+                # if tick_enabled != controller.tick_status:
+                controller.toggle_tick(enabled=True, save=False)  # або окремий метод set_tick(tick_enabled)
+                state = "увімкнено"  # if tick_enabled else "вимкнено"
+                messages_to_user.append(f"Тікання годинника {state}")
+            else:
+                controller.toggle_tick(enabled=False, save=False)
+                state = "вимкнено"
+                messages_to_user.append(f"Тікання годинника {state}")
+        else:
+            logger.debug(f"ClockControlView.post(): toggle_tick == {request.POST.get('toggle_tick')}")
+            if request.POST.get('toggle_tick') == "button":
+                logger.debug(f"ClockControlView.post(): request.POST.get('toggle_tick') htmx")
+                controller.toggle_tick()
+                state = "увімкнено" if controller.tick_status else "вимкнено"
+                messages_to_user.append(f"Тікання годинника {state}")
+                return render(
+                    request,
+                    "includes/clock_item.html",
+                    {"clock": clock}
+                )
 
         # --- Час ---
         current_time = request.POST.get("current_time")
@@ -246,7 +281,7 @@ class ClockControlView(LoginRequiredMixin, View):
                 tz = pytz.timezone(request.user.timezone)
                 dt_naive = datetime.datetime.fromisoformat(current_time)
                 dt_user = tz.localize(dt_naive)
-                controller.set_time(dt_user, save=False)
+                controller.set_time(dt_user, save=False, tick_auto_pause=False)
                 messages_to_user.append(
                     f"Час годинника оновлено на {dt_user}"
                 )
@@ -261,7 +296,15 @@ class ClockControlView(LoginRequiredMixin, View):
                     context,
                     status=400,
                 )
+        # --- Встановити швидкість часу
+        old_speed = controller.get_clock_speed()
+        new_speed = request.POST.get("clock_speed")
+        if new_speed and old_speed != new_speed:
+            controller.set_clock_speed(new_speed, save=False)
+            logger.debug(f"accounts.views.ClockControlView.post(): set speed multiplier to: {new_speed}")
+            messages.info(request, f"Змінений коефіцієнт швидкості на {new_speed}")
 
+        # --- Додати користувачів ---
         if self.request.user == clock.user_owner:
             add_user_id = request.POST.get("add_user_id")
             if add_user_id:
@@ -270,7 +313,8 @@ class ClockControlView(LoginRequiredMixin, View):
                     m = "Користувача з таким ID не існує"
                     messages_to_user.append(m)
                     messages.error(request, m)
-                    logger.debug(f"ClockControlView.post(): add_user ID: {add_user_id}: користувача з таким ID не існує")
+                    logger.debug(
+                        f"ClockControlView.post(): add_user ID: {add_user_id}: користувача з таким ID не існує")
                     # return HttpResponse(
                     #     f"<div class='alert alert-info alert-dismissible fade show'>Юзер {user.id} не існує</div>"
                     # )
@@ -296,6 +340,7 @@ class ClockControlView(LoginRequiredMixin, View):
                     context,
                 )
 
+            # --- Видалити користувачів ---
             remove_user_id = request.POST.get("remove_user_id")
             if remove_user_id:
                 remove_user = User.objects.filter(id=remove_user_id).first()
@@ -311,7 +356,8 @@ class ClockControlView(LoginRequiredMixin, View):
                     m = "Користувача з таким ID не існує"
                     messages_to_user.append(m)
                     messages.error(request, m)
-                    logger.debug(f"ClockControlView.post(): add_user ID: {add_user_id}: користувача з таким ID не існує")
+                    logger.debug(
+                        f"ClockControlView.post(): add_user ID: {add_user_id}: користувача з таким ID не існує")
                 return render(
                     request,
                     "includes/allowed_users_table.html",
@@ -343,23 +389,23 @@ class UserSearchView(LoginRequiredMixin, View):
         return bool(re.fullmatch(UserSearchView.USERNAME_RE, value))
 
     def get(self, request, clock_id):
-        logger.debug(f"core.views.UserSearchByIdView.get(): start")
+        logger.debug(f"accounts.views.UserSearchByIdView.get(): start")
         raw_user_input = request.GET.get("user_id", "").strip()
-        logger.debug(f"core.views.UserSearchByIdView.get(): clock_id:{clock_id} raw_user_id:{raw_user_input}")
+        logger.debug(f"accounts.views.UserSearchByIdView.get(): clock_id:{clock_id} raw_user_id:{raw_user_input}")
 
         if str(raw_user_input) == "":
-            logger.debug(f"core.views.UserSearchByIdView.get(): empty input")
+            logger.debug(f"accounts.views.UserSearchByIdView.get(): empty input")
             return HttpResponse()
         elif raw_user_input.isdigit():
             user_id = int(raw_user_input)
-            logger.debug(f"core.views.UserSearchByIdView.get(): looking for user id:{user_id}")
+            logger.debug(f"accounts.views.UserSearchByIdView.get(): looking for user id:{user_id}")
             user = (
                 User.objects
                 .filter(id=user_id)
                 .exclude(virtual_clocks__id=clock_id).exclude(shared_clocks__id=clock_id)
                 .first()
             )
-            logger.debug(f"core.views.UserSearchByIdView.get(): user: {user}")
+            logger.debug(f"accounts.views.UserSearchByIdView.get(): user: {user}")
             return render(
                 request,
                 "includes/user_search_by_id.html",
@@ -367,21 +413,21 @@ class UserSearchView(LoginRequiredMixin, View):
             )
         elif self.is_valid_username(raw_user_input):
             username = raw_user_input
-            logger.debug(f"core.views.UserSearchByIdView.get(): looking for user id:{username}")
+            logger.debug(f"accounts.views.UserSearchByIdView.get(): looking for user id:{username}")
             user = (
                 User.objects
                 .filter(username=username)
                 .exclude(virtual_clocks__id=clock_id).exclude(shared_clocks__id=clock_id)
                 .first()
             )
-            logger.debug(f"core.views.UserSearchByIdView.get(): looking for user id:{"Found" if user else "Not Found"}")
+            logger.debug(f"accounts.views.UserSearchByIdView.get(): looking for user id:{"Found" if user else "Not Found"}")
             return render(
                 request,
                 "includes/user_search_by_id.html",
                 {'found_user': user, 'clock_id': clock_id}
             )
         else:
-            logger.debug(f"core.views.UserSearchByIdView.get(): not valid input")
+            logger.debug(f"accounts.views.UserSearchByIdView.get(): not valid input")
             return render(
                 request,
                 "includes/user_search_by_id.html",

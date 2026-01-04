@@ -5,6 +5,7 @@ from logging import getLogger
 import pytz
 from django.contrib.auth import get_user_model
 from django.contrib.messages import get_messages
+from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.urls import reverse
 
@@ -47,7 +48,7 @@ class SignUpViewTests(TestCase):
 class ProfileDashboardViewTests(TestCase):
 
     def setUp(self):
-        self.user = User.objects.create_user(username="emily", password="verySecret123!")
+        self.user = User.objects.create_user(username="emily", password="verySecret123!", max_clocks_count=10)
         self.url = reverse("profile_dashboard")
         self.client.login(username="emily", password="verySecret123!")
 
@@ -77,7 +78,7 @@ class ProfileDashboardViewTests(TestCase):
 class ProfileTokensViewTests(TestCase):
 
     def setUp(self):
-        self.user = User.objects.create_user(username="emily", password="verySecret123!")
+        self.user = User.objects.create_user(username="emily", password="verySecret123!", max_clocks_count=10)
         VirtualClock.objects.create(user_owner=self.user)
         self.client.login(username="emily", password="verySecret123!")
         self.url = reverse("profile_tokens")
@@ -93,7 +94,7 @@ class ProfileTokensViewTests(TestCase):
 class ProfileClocksViewTest(TestCase):
 
     def setUp(self):
-        self.user = User.objects.create_user(username="emily", password="verySecret123!")
+        self.user = User.objects.create_user(username="emily", password="verySecret123!", max_clocks_count=10)
         VirtualClock.objects.create(user_owner=self.user)
         self.client.login(username="emily", password="verySecret123!")
         self.url = reverse("profile_clocks")
@@ -109,7 +110,7 @@ class ProfileClocksViewTest(TestCase):
 class ClockDetailViewTest(TestCase):
 
     def setUp(self):
-        self.user = User.objects.create_user(username="emily", password="verySecret123!")
+        self.user = User.objects.create_user(username="emily", password="verySecret123!", max_clocks_count=10)
         self.clock = VirtualClock.objects.create(user_owner=self.user)
         self.client.login(username="emily", password="verySecret123!")
         self.url = reverse("clock_detail", args=[self.clock.id])
@@ -126,7 +127,7 @@ class ClockDetailViewTest(TestCase):
 class ClockCreateViewTest(TestCase):
 
     def setUp(self):
-        self.user = User.objects.create_user(username="emily", password="verySecret123!")
+        self.user = User.objects.create_user(username="emily", password="verySecret123!", max_clocks_count=10)
         self.client.login(username="emily", password="verySecret123!")
         self.url = reverse("clock_create")
 
@@ -163,7 +164,7 @@ class ClockCreateViewTest(TestCase):
 class ClockDeleteViewTest(TestCase):
 
     def setUp(self):
-        self.user = User.objects.create_user(username="emily", password="verySecret123!")
+        self.user = User.objects.create_user(username="emily", password="verySecret123!", max_clocks_count=10)
         self.clock = VirtualClock.objects.create(user_owner=self.user)
         self.client.login(username="emily", password="verySecret123!")
         self.url = reverse("clock_delete", args=[self.clock.id])
@@ -245,20 +246,20 @@ class ProfileSettingsViewTest(TestCase):
 
 class ClockControlViewTest(TestCase):
     def setUp(self):
-        self.user = User.objects.create_user(username="emily", password="verySecret123!")
-        self.user1 = User.objects.create_user(username="emily1", password="verySecret123!")
+        self.user = User.objects.create_user(username="emily", password="verySecret123!", max_clocks_count=10)
+        self.user1 = User.objects.create_user(username="emily1", password="verySecret123!", max_clocks_count=10)
         self.clock = VirtualClock.objects.create(user_owner=self.user)
         self.client.login(username="emily", password="verySecret123!")
         self.url = reverse("clock_control", args=[self.clock.id])
         self.next = reverse("clock_detail", args=[self.clock.id])
 
-    def test_control_view_requires_login(self):
+    def test_view_requires_login(self):
         self.client.logout()
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 302)
         self.assertIn("login", response.url)
 
-    def test_view_edits_time_success(self):
+    def test_set_time_success(self):
         now = '2011-11-04 00:05:23.283'
         now_dt = datetime.datetime.strptime(now, "%Y-%m-%d %H:%M:%S.%f")
         # logger.debug(f"Current time: {now}")
@@ -274,7 +275,7 @@ class ClockControlViewTest(TestCase):
         clock = VirtualClock.objects.get(pk=self.clock.pk)
         self.assertEqual(clock.current_time, tz.localize(now_dt))
 
-    def test_view_edits_time_failure(self):
+    def test_set_time_failure(self):
         now = 'invalid_time'
         response = self.client.post(self.url,
                                     {"current_time": now},
@@ -285,28 +286,29 @@ class ClockControlViewTest(TestCase):
         self.assertRaises(ValueError)
         self.assertContains(response, "Не вдалося встановити час. Перевірте правильність формату", status_code=400)
 
-    def test_control_view_post_toggle_tick(self):
+    def test_post_toggle_tick_checkbox(self):
         old_state = self.clock.tick_enabled
-        response = self.client.post(self.url, data={'toggle_tick': 'toggle_tick'}, follow=True)
+        response = self.client.post(self.url, data={'toggle_tick': 'checkbox'}, follow=True)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(VirtualClock.objects.count(), 1)
         self.assertNotEqual(VirtualClock.objects.first().tick_enabled, old_state)
 
-    def test_control_view_post_tick_enabled(self):
+    def test_post_toggle_tick_button(self):
         old_state = self.clock.tick_enabled
-        response = self.client.post(self.url, data={'tick_enabled': 'on'}, follow=True)
+        response = self.client.post(self.url, data={'toggle_tick': 'button'}, follow=True, HTTP_HX_REQUEST=True)
+        self.clock.refresh_from_db()
         self.assertEqual(response.status_code, 200)
         self.assertEqual(VirtualClock.objects.count(), 1)
-        self.assertNotEqual(VirtualClock.objects.first().tick_enabled, old_state)
+        self.assertNotEqual(self.clock.tick_enabled, old_state)
 
-    def test_control_view_post_set_clock_name(self):
+    def test_post_set_clock_name(self):
         old_name = self.clock.name
         response = self.client.post(self.url, data={'clock_name': 'New Clock Name'}, follow=True)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(VirtualClock.objects.count(), 1)
         self.assertNotEqual(VirtualClock.objects.first().name, old_name)
 
-    def test_control_view_post_add_user_success(self):
+    def test_post_add_user_success(self):
         response = self.client.post(self.url, data={'add_user_id': self.user1.id})
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, "includes/allowed_users_table.html")
@@ -319,7 +321,7 @@ class ClockControlViewTest(TestCase):
         self.assertTrue(messages)
         self.assertEqual(messages[0].message, f"Доступ надано: {self.user1.username}")
 
-    def test_control_view_post_add_user_failure(self):
+    def test_post_add_user_failure(self):
         response = self.client.post(self.url, data={'add_user_id': self.user1.id + 1}, follow=True)
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, self.user1.username)
@@ -330,7 +332,7 @@ class ClockControlViewTest(TestCase):
         self.assertTrue(messages)
         self.assertEqual(messages[0].message, f"Користувача з таким ID не існує")
 
-    def test_control_view_post_add_user_already_have_access(self):
+    def test_post_add_user_already_have_access(self):
         self.clock.allowed_users.add(self.user1)
         response = self.client.post(self.url, data={'add_user_id': self.user1.id})
         self.assertEqual(response.status_code, 200)
@@ -344,7 +346,7 @@ class ClockControlViewTest(TestCase):
         self.assertTrue(messages)
         self.assertEqual(messages[0].message, f"Користувач уже має доступ")
 
-    def test_control_view_post_remove_user_success(self):
+    def test_post_remove_user_success(self):
         self.clock.allowed_users.add(self.user1)
         response = self.client.post(self.url, data={'remove_user_id': self.user1.id})
         self.assertTemplateUsed(response, "includes/allowed_users_table.html")
@@ -354,7 +356,7 @@ class ClockControlViewTest(TestCase):
         self.assertTrue(messages)
         self.assertEqual(messages[0].message, f"Користувача {self.user1.username} з ID {self.user1.id} видалено")
 
-    def test_control_view_post_remove_user_failure(self):
+    def test_post_remove_user_failure(self):
         self.clock.allowed_users.add(self.user1)
         response = self.client.post(self.url, data={'remove_user_id': self.user1.id + 1})
         logger.debug(f"Response: {response.content.decode()}")
@@ -364,6 +366,30 @@ class ClockControlViewTest(TestCase):
         self.assertEqual(len(messages), 1)
         self.assertTrue(messages)
         self.assertEqual(messages[0].message, f"Користувача з таким ID не існує")
+
+    def test_post_set_valid_speed(self):
+        validators = self.clock._meta.get_field("speed").validators
+        response = self.client.post(self.url, data={'clock_speed': validators[1].limit_value, 'next': self.next},
+                                    follow=True)
+        self.clock.refresh_from_db()
+        logger.debug(f"Response: {response}")
+        self.assertTemplateUsed(response, "accounts/clock_detail.html")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.clock.speed, validators[1].limit_value)
+
+    def test_post_set_non_valid_speed(self):
+        validators = self.clock._meta.get_field("speed").validators
+        with self.assertRaises(ValidationError):
+            response = self.client.post(self.url, data={'clock_speed': validators[1].limit_value+1,
+                                                    'next': self.next},
+                                    follow=True)
+
+    def test_get_current_time(self):
+        r = self.client.get(self.url)
+        current_time = r.json()['current_time']
+        logger.debug(f"accounts.tests.test_accounts_views.ClockControlViewTest."
+                     f"test_get_current_time(): response: current_time: {current_time}")
+        self.assertEqual(current_time, self.clock.current_time.isoformat())
 
 
 class UserTokenUpdateViewTest(TestCase):
@@ -402,7 +428,7 @@ class UserSearchViewTest(TestCase):
         logger.debug(f"accounts.tests.test_accounts_views."
                      f"UserSearchByIdViewTest.test_user_search_by_id_view_not_found:"
                      f"url: {self.url}")
-        response = self.client.get(self.url, {"user_id": self.user1.id+1},
+        response = self.client.get(self.url, {"user_id": self.user1.id + 1},
                                    HTTP_HX_REQUEST="true",
                                    )
         self.assertEqual(response.status_code, 200)

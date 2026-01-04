@@ -38,7 +38,7 @@ class TimeShiftUser(AbstractUser):
         help_text="Часова зона користувача, наприклад Europe/Kyiv"
     )
     phone_number = PhoneNumberField(blank=False, null=False)
-    max_clocks_count = models.PositiveIntegerField(default=3)
+    max_clocks_count = models.PositiveIntegerField(default=1)
 
     def save(self, *args, **kwargs):
         if not self._api_token:

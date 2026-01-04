@@ -61,3 +61,12 @@ body {
     --bs-gradient-to: var(gray);
     background: linear-gradient(to top, var(--bs-gradient-from), var(--bs-gradient-to) !important;
 }
+
+/*.alert-msg {
+  opacity: 1;
+  transition: opacity 0.5s ease; // як довго плавно зникає
+}
+
+.alert-msg.fade-out {
+  opacity: 0; // візуальне зникнення
+}*/

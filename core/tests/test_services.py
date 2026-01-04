@@ -21,7 +21,7 @@ class TestVirtualClockController(TransactionTestCase):
     reset_sequences = True
 
     def setUp(self):
-        self.user = User.objects.create_user(username="testuser", password="testpass")
+        self.user = User.objects.create_user(username="testuser", password="testpass", max_clocks_count=10)
         self.clock = VirtualClock.objects.create(user_owner=self.user)
         self.controller = VirtualClockController(self.clock)
 

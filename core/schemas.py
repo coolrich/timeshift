@@ -25,6 +25,7 @@ class BaseClockSchema(Schema):
     clock_id: int
     name: str | None
     time: str
+    speed: float
     allowed_users: Optional[List[int]] = None
     tick_enabled: bool
 
@@ -36,6 +37,7 @@ class TimeDataUpdate(Schema):
     clock_id: Optional[int] = None
     name: Optional[str] = None
     time: Optional[str] = None
+    speed: Optional[float] = None
     tick_enabled: Optional[bool] = None
     allowed_users: Optional[List[int]] = None  # остаточний список allowed_users після оновлення
     changed_fields: List[str] = []            # які поля реально змінилися
@@ -45,6 +47,7 @@ class ClockUpdateRequest(Schema):
     clock_id: int
     name: Optional[str] = None
     time: Optional[str] = None
+    speed: Optional[float] = None
     tick_enabled: Optional[bool] = False
     allowed_users: Optional[List[int]] = None   # повна заміна
     add_users: Optional[List[int]] = None       # додати

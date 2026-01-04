@@ -1,6 +1,7 @@
 from datetime import timezone, timedelta, datetime
 from logging import getLogger
 from typing import Any, Type
+from zoneinfo import ZoneInfo
 
 from django.contrib.auth import get_user_model
 from django.db.models import QuerySet
@@ -50,7 +51,7 @@ class VirtualClockController:
         if self._virtual_clock.tick_enabled:
             now = timezone.now()
             delta = now - self._virtual_clock.last_updated
-            return self._virtual_clock.current_time + delta
+            return self._virtual_clock.current_time + delta*self._virtual_clock.speed
         return self._virtual_clock.current_time
 
     def get_iso_time(self) -> str:
@@ -61,7 +62,11 @@ class VirtualClockController:
             str: The current virtual UTC time as an ISO formatted string.
             The time is calculated based on the current state of the clock.
         """
-        return self._current_time().isoformat()
+        tz = ZoneInfo(self.get_user_owner().timezone)  # наприклад "Europe/Kyiv"
+        return self._current_time().astimezone(tz).isoformat()
+
+    def get_time_zone(self):
+        return self.get_user_owner().timezone
 
     def get_time(self) -> datetime:
         """
@@ -82,13 +87,14 @@ class VirtualClockController:
         """
         return self._virtual_clock.user_owner
 
-    def set_time(self, new_time: datetime, save: bool=True) -> Type['VirtualClockController']:
+    def set_time(self, new_time: datetime, save: bool=True, tick_auto_pause: bool=True) -> Type['VirtualClockController']:
         """
         Set the virtual clock to a specific time and stop the tick.
 
         Args:
             new_time (datetime): The new time to set for the virtual clock.
             save (bool): automatically save to database if True
+            tick_auto_pause (bool): automatically pause tick if True
         Returns:
             VirtualClock: The updated VirtualClock instance.
             Note: Changes are in memory only, call save() to persist to database.
@@ -96,10 +102,30 @@ class VirtualClockController:
         now = timezone.now()
         self._virtual_clock.current_time = new_time
         self._virtual_clock.last_updated = now
-        self._virtual_clock.tick_enabled = False
+        if tick_auto_pause:
+            self._virtual_clock.tick_enabled = False
         if save:
             self.save()
         return self
+
+    def set_clock_speed(self, new_speed:float, save=True, full_clean:bool=True):
+        try:
+            new_speed = float(new_speed)
+        except ValueError:
+            raise HttpError(400, "Invalid speed value")
+        now = timezone.now()
+        self._virtual_clock.current_time = self._current_time()
+        self._virtual_clock.last_updated = now
+        # self._virtual_clock.tick_enabled = False
+        self._virtual_clock.speed = new_speed
+        if save:
+            self._virtual_clock.save()
+        if full_clean:
+            self._virtual_clock.full_clean()
+        return self
+
+    def get_clock_speed(self) -> float:
+        return self._virtual_clock.speed
 
     def set_real_time(self, save: bool=True) -> Type['VirtualClockController']:
         """

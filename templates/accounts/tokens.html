@@ -2,26 +2,26 @@
 {% block title %}Мій кабінет – {{ ENV_SITE_NAME }}{% endblock %}
 
 {% block profile_content %}
-<h2 class="mb-4">Мій кабінет</h2>
+<h2 class="mb-4">API токен</h2>
 
-<div class="row g-4">
-    <div class="col-md-6 col-xl-3">
-        <div class="card shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title text-muted">Віртуальні годинники</h5>
-                <h2>{{ user.virtual_clocks.count }}</h2>
-            </div>
-        </div>
-    </div>
+<!--<div class="row g-4">-->
+<!--    <div class="col-md-6 col-xl-3">-->
+<!--        <div class="card shadow-sm">-->
+<!--            <div class="card-body">-->
+<!--                <h5 class="card-title text-muted">Віртуальні годинники</h5>-->
+<!--                <h2>{{ user.virtual_clocks.count }}</h2>-->
+<!--            </div>-->
+<!--        </div>-->
+<!--    </div>-->
 
-    <div class="col-md-6 col-xl-3">
-        <div class="card shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title text-muted">Останній вхід</h5>
-                <p class="fs-5">{{ user.last_login|date:"d.m.Y H:i" }}</p>
-            </div>
-        </div>
-    </div>
+<!--    <div class="col-md-6 col-xl-3">-->
+<!--        <div class="card shadow-sm">-->
+<!--            <div class="card-body">-->
+<!--                <h5 class="card-title text-muted">Останній вхід</h5>-->
+<!--                <p class="fs-5">{{ user.last_login|date:"d.m.Y H:i" }}</p>-->
+<!--            </div>-->
+<!--        </div>-->
+<!--    </div>-->
 
     <div class="col-md-12">
         <div class="card shadow-sm mt-3">

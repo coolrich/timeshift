@@ -9,15 +9,15 @@
 {% if requested_user == user_owner %}
 <label for="user_id"><strong>Додати користувачів:</strong></label>
 <input
-    type="text"
-    id="user_id"
-    name="user_id"
-    class="form-control"
-    placeholder="ID або нікнейм користувача"
-    hx-get="{% url 'user_search_by_id' clock.id %}"
-    hx-trigger="keyup delay:300ms"
-    hx-target="#user-search-results"
-    autocomplete="off"
+        type="text"
+        id="user_id"
+        name="user_id"
+        class="form-control"
+        placeholder="ID або нікнейм користувача"
+        hx-get="{% url 'user_search_by_id' clock.id %}"
+        hx-trigger="keyup delay:300ms"
+        hx-target="#user-search-results"
+        autocomplete="off"
 >
 
 <div id="user-search-results" class="mt-2"
@@ -39,44 +39,128 @@
 
     <!-- Тікання -->
     <div class="form-check mb-2">
-        <input class="form-check-input" type="checkbox" name="tick_enabled" id="tick_enabled"
-               {% if clock.tick_enabled %} checked {% endif %}>
         <label class="form-check-label" for="tick_enabled">Тікання увімкнено</label>
+        <input class="form-check-input" type="checkbox" name="toggle_tick" value="checkbox" id="tick_enabled"
+               {% if clock.tick_enabled %} checked {% endif %}>
     </div>
 
     <!-- Поточний час -->
     <label for="current_time"><strong>Поточний час:</strong></label>
-    <p><strong>{{ current_time|date:"d.m.Y H:i:s" }}</strong></p>
+    <p id="clock-time"><strong>{{ current_time|date:"d.m.Y H:i:s" }}</strong></p>
+
 
     <!-- Оновити час -->
     <label for="current_time" class="form-label">
-    <strong>Оновити час</strong>
+        <strong>Оновити час</strong>
     </label>
-<div class="input-group mb-2">
-    <span class="input-group-text">ISO 8601</span>
-    <input
-        type="datetime-local"
-        name="current_time"
-        id="current_time"
-        class="form-control"
-        placeholder="2025-11-26T04:32:15"
-    >
-</div>
+    <div class="input-group mb-2">
+        <span class="input-group-text">ISO 8601</span>
+        <input
+                type="datetime-local"
+                name="current_time"
+                id="current_time"
+                class="form-control"
+                placeholder="2025-11-26T04:32:15"
+        >
+    </div>
 
-
-<button type="submit" class="btn btn-primary mt-2">Зберегти</button>
+    <!-- Швидкість -->
+    <label for="clock_speed"><strong>Швидкість (множник часу):</strong></label>
+    <div class="d-flex align-items-center mb-2">
+        {% load custom_tags %}
+        <input
+                type="range"
+                step="0.01"
+                min="0.01"
+                max="100"
+                name="clock_speed"
+                id="clock_speed"
+                class="form-range me-2"
+                value="{{ clock.speed|floatformat:2|dotdecimal }}"
+                title="Мінімум 0.01, максимум 100"
+        />
+        <span id="clock_speed_value" class="fw-bold">{{clock.speed|floatformat:2|dotdecimal}}</span>
+    </div>
+    <button type="submit" class="btn btn-primary mt-2">Зберегти</button>
 
 </form>
 
-<!--{% if messages %}-->
-<!--    {% for message in messages %}-->
-<!--        <div class="alert alert-info alert-dismissible fade show mt-2" role="alert">-->
-<!--            {{ message }}-->
-<!--            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>-->
-<!--        </div>-->
-<!--    {% endfor %}-->
-<!--{% endif %}-->
-
 <hr>
 <a href="{% url 'profile_clocks' %}" class="btn btn-secondary mt-3">← Назад</a>
+<!-- JS для автоматичного оновлення часу -->
+<script>
+    const speedInput = document.getElementById('clock_speed');
+    const speedValue = document.getElementById('clock_speed_value');
+
+    // Показуємо початкове значення з крапкою
+    speedValue.textContent = parseFloat(speedInput.value).toFixed(2);
+
+    // Оновлюємо під час руху повзунка
+    speedInput.addEventListener('input', () => {
+        speedValue.textContent = parseFloat(speedInput.value).toFixed(2);
+    });
+
+
+    // Парсимо серверний час із шаблону
+    let clockElement = document.getElementById('clock-time');
+    let serverTime = new Date("{{ current_time|date:'Y-m-d H:i:s' }}".replace(' ', 'T'));
+    let tickEnabled = {% if clock.tick_enabled %}true{% else %}false{% endif %};
+    let clockSpeedInput = document.getElementById('clock_speed');
+
+    let lastUpdate = Date.now();
+
+function updateClock() {
+    if (!tickEnabled) return;
+
+    const now = Date.now();
+    const delta = now - lastUpdate; // скільки мс пройшло з останнього оновлення
+    lastUpdate = now;
+
+    // Додаємо delta * швидкість
+    serverTime.setMilliseconds(serverTime.getMilliseconds() + delta * {{clock.speed|dotdecimal}});
+
+    let day = String(serverTime.getDate()).padStart(2, '0');
+    let month = String(serverTime.getMonth() + 1).padStart(2, '0');
+    let year = serverTime.getFullYear();
+    let hours = String(serverTime.getHours()).padStart(2, '0');
+    let minutes = String(serverTime.getMinutes()).padStart(2, '0');
+    let seconds = String(serverTime.getSeconds()).padStart(2, '0');
+
+    clockElement.innerHTML = `<strong>${day}.${month}.${year} ${hours}:${minutes}:${seconds}</strong>`;
+}
+
+    // Оновлюємо що секунду
+    setInterval(updateClock, 100);
+
+    // Додатково: якщо швидкість змінюється, JS враховує нове значення автоматично
+    // нічого робити не треба, бо updateClock бере значення з input кожен раз
+
+    setInterval(() => {
+    fetch("{% url 'clock_control' clock.id %}")
+        .then(r => r.json())
+        .then(data => {
+            const serverTime = new Date(data.current_time);
+
+            // Припускаємо, що сервер віддає назву таймзони, наприклад "Europe/Kyiv"
+            const timeText = serverTime.toLocaleString(navigator.language, {
+                day: "2-digit",
+                month: "2-digit",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+                millisecond: "2-digit",
+                hour12: false,
+                timeZone: data.timezone
+            });
+
+            clockElement.innerHTML = `<strong>${timeText}</strong>`;
+
+        });
+}, 10000);
+
+
+</script>
+
 {% endblock %}
+

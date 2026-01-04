@@ -3,6 +3,7 @@ import logging
 import warnings
 
 from django.contrib.auth import get_user_model
+from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models, IntegrityError
 from django.utils import timezone
 
@@ -21,6 +22,13 @@ class VirtualClock(models.Model):
 
     current_time = models.DateTimeField(default=timezone.now)
     last_updated = models.DateTimeField(default=timezone.now)
+    speed = models.FloatField(
+        default=1.0,
+        validators=[
+            MinValueValidator(0.01),
+            MaxValueValidator(100.0),
+        ],
+    )
     tick_enabled = models.BooleanField(default=False)
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -44,7 +52,7 @@ class VirtualClock(models.Model):
         if self.pk and self.allowed_users.filter(pk=self.user_owner.pk).exists():
             raise IntegrityError("Owner cannot be in allowed_users.")
 
-        if self.user_owner.virtual_clocks.count() > self.user_owner.max_clocks_count:
+        if not self.pk and self.user_owner.virtual_clocks.count() >= self.user_owner.max_clocks_count:
             for clock in self.user_owner.virtual_clocks.order_by("-created_at").all():
                 if self.user_owner.virtual_clocks.count() <= self.user_owner.max_clocks_count:
                     break
