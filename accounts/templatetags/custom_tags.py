@@ -10,3 +10,7 @@ def dotdecimal(value):
         return str(float(str(value).replace(',', '.')))
     except (ValueError, TypeError):
         return value
+
+@register.filter
+def dict_get(d, key):
+    return d.get(key)

@@ -71,8 +71,8 @@
         <input
                 type="range"
                 step="0.01"
-                min="0.01"
-                max="100"
+                min="{{min_speed | dotdecimal}}"
+                max="{{max_speed | dotdecimal}}"
                 name="clock_speed"
                 id="clock_speed"
                 class="form-range me-2"
@@ -117,7 +117,7 @@ function updateClock() {
     lastUpdate = now;
 
     // Додаємо delta * швидкість
-    serverTime.setMilliseconds(serverTime.getMilliseconds() + delta * {{clock.speed|dotdecimal}});
+    serverTime.setMilliseconds(serverTime.getMilliseconds() + delta * {{clock.speed | dotdecimal}});
 
     let day = String(serverTime.getDate()).padStart(2, '0');
     let month = String(serverTime.getMonth() + 1).padStart(2, '0');
@@ -141,20 +141,14 @@ function updateClock() {
         .then(data => {
             const serverTime = new Date(data.current_time);
 
-            // Припускаємо, що сервер віддає назву таймзони, наприклад "Europe/Kyiv"
-            const timeText = serverTime.toLocaleString(navigator.language, {
-                day: "2-digit",
-                month: "2-digit",
-                year: "numeric",
-                hour: "2-digit",
-                minute: "2-digit",
-                second: "2-digit",
-                millisecond: "2-digit",
-                hour12: false,
-                timeZone: data.timezone
-            });
+            const optionsDate = { day: "2-digit", month: "2-digit", year: "numeric", timeZone: data.timezone };
+            const optionsTime = { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false, timeZone: data.timezone };
 
-            clockElement.innerHTML = `<strong>${timeText}</strong>`;
+            const datePart = serverTime.toLocaleDateString(navigator.language, optionsDate);
+            const timePart = serverTime.toLocaleTimeString(navigator.language, optionsTime);
+
+            clockElement.innerHTML = `<strong>${datePart} ${timePart}</strong>`;
+
 
         });
 }, 10000);

@@ -102,6 +102,18 @@ class ProfileClocksView(LoginRequiredMixin, ListView):
         context["shared_count"] = shared_count
         context["shared_clocks"] = dict(grouped)
         logger.debug(f"ProfileClocksView.get_context_data(): shared_count: {shared_count}")
+        # logger.debug(f"")
+        clock_api_urls = {
+            clock.id:
+                self.request.build_absolute_uri(
+                    reverse("api-1.0.0:api-retrieve-clock", kwargs={"clock_id": clock.id}))
+            for clock in clocks
+        }
+        context['clock_api_urls_retrieve'] = clock_api_urls
+        context['clock_api_url_update'] = self.request.build_absolute_uri(
+            reverse("api-1.0.0:api-update-clock"))
+        logger.debug(
+            f"accounts.views.ClockDetailView.get_context_data(): clocks={clocks}")
         return context
 
 
@@ -129,6 +141,11 @@ class ClockDetailView(LoginRequiredMixin, DetailView):
         context["requested_user"] = self.request.user
         context["user_owner"] = vcc.get_user_owner()
         # context['tick_enabled'] = vcc.tick_status
+        min_speed, max_speed = VirtualClock._meta.get_field("speed").validators
+        context['min_speed'] = min_speed.limit_value
+        context['max_speed'] = max_speed.limit_value
+        logger.debug(f"accounts.views.ClockDetailView.get_context(): min_speed: {context['min_speed']} "
+                     f"max_speed: {context['max_speed']}")
         user_tz = self.request.user.timezone
         dj_tz.activate(user_tz)
         logger.debug(f"Current time: {vcc.get_iso_time()}")
@@ -252,12 +269,12 @@ class ClockControlView(LoginRequiredMixin, View):
         logger.debug(f"ClockControlView.post(): element: {element}")
         if not is_htmx:
             logger.debug(f"ClockControlView.post(): if tick_enabled != controller.tick_status not htmx")
-            if element == "checkbox":
+            if element == "checkbox" and not controller.tick_status:
                 # if tick_enabled != controller.tick_status:
                 controller.toggle_tick(enabled=True, save=False)  # або окремий метод set_tick(tick_enabled)
                 state = "увімкнено"  # if tick_enabled else "вимкнено"
                 messages_to_user.append(f"Тікання годинника {state}")
-            else:
+            elif not element and controller.tick_status:
                 controller.toggle_tick(enabled=False, save=False)
                 state = "вимкнено"
                 messages_to_user.append(f"Тікання годинника {state}")
@@ -299,7 +316,8 @@ class ClockControlView(LoginRequiredMixin, View):
         # --- Встановити швидкість часу
         old_speed = controller.get_clock_speed()
         new_speed = request.POST.get("clock_speed")
-        if new_speed and old_speed != new_speed:
+        logger.debug(f"accounts.views.ClockControlView.post(): old_speed: {old_speed} new_speed: {new_speed}")
+        if new_speed and old_speed != float(new_speed):
             controller.set_clock_speed(new_speed, save=False)
             logger.debug(f"accounts.views.ClockControlView.post(): set speed multiplier to: {new_speed}")
             messages.info(request, f"Змінений коефіцієнт швидкості на {new_speed}")
@@ -420,7 +438,8 @@ class UserSearchView(LoginRequiredMixin, View):
                 .exclude(virtual_clocks__id=clock_id).exclude(shared_clocks__id=clock_id)
                 .first()
             )
-            logger.debug(f"accounts.views.UserSearchByIdView.get(): looking for user id:{"Found" if user else "Not Found"}")
+            logger.debug(
+                f"accounts.views.UserSearchByIdView.get(): looking for user id:{"Found" if user else "Not Found"}")
             return render(
                 request,
                 "includes/user_search_by_id.html",

@@ -288,7 +288,18 @@ class ClockControlViewTest(TestCase):
 
     def test_post_toggle_tick_checkbox(self):
         old_state = self.clock.tick_enabled
+        self.client.post(self.url, data={'toggle_tick': 'checkbox'}, follow=True)
         response = self.client.post(self.url, data={'toggle_tick': 'checkbox'}, follow=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(VirtualClock.objects.count(), 1)
+        self.assertNotEqual(VirtualClock.objects.first().tick_enabled, old_state)
+
+    def test_post_toggle_tick_checkbox_empty(self):
+        self.client.post(self.url, data={'toggle_tick': 'checkbox'}, follow=True)
+        self.clock.refresh_from_db()
+        old_state = self.clock.tick_enabled
+        self.client.post(self.url, data={'toggle_tick': ""}, follow=True)
+        response = self.client.post(self.url, data={'toggle_tick': ""}, follow=True)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(VirtualClock.objects.count(), 1)
         self.assertNotEqual(VirtualClock.objects.first().tick_enabled, old_state)

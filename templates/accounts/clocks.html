@@ -1,4 +1,6 @@
 {% extends "accounts/profile_base.html" %}
+{% load custom_tags %}
+
 {% block title %}Мої годинники – {{ ENV_SITE_NAME }}{% endblock %}
 
 {% block profile_content %}
@@ -12,6 +14,24 @@
            title="Створити новий віртуальний годинник">
             ➕ Створити
         </a>
+
+        <input
+                type="text"
+                id="api-link-update-clock"
+                value="{{ clock_api_url_update }}"
+                readonly
+                hidden
+        >
+        <button
+                type="button"
+                class="btn btn-outline-secondary btn-sm"
+                title="Копіювати API-посилання на Update Clock"
+                onclick="copyApiLink('api-link-update-clock')"
+        >
+            <i class="bi bi-clipboard"></i>
+            Update link
+        </button>
+
         <button class="btn btn-sm btn-outline-secondary"
                 data-bs-toggle="collapse"
                 data-bs-target="#myClocks"
@@ -46,6 +66,28 @@
                     <!--                     class="list-group-item d-flex justify-content-between align-items-center">-->
                     {% include 'includes/clock_item.html' %}
                 </div>
+
+
+                <input
+                        type="text"
+                        id="api-link-retrieve-clock-{{ clock.id }}"
+                        value="{{ clock_api_urls_retrieve | dict_get:clock.id }}"
+                        readonly
+                        hidden
+                >
+
+
+                <button
+                        type="button"
+                        class="btn btn-outline-secondary btn-sm"
+                        title="Копіювати API-посилання на Retrieve Clock"
+                        onclick="copyApiLink('api-link-retrieve-clock-{{ clock.id }}')"
+                >
+                    <i class="bi bi-clipboard"></i>
+                    Retrieve Link
+                </button>
+
+
                 <a href="{% url 'clock_delete' clock.id %}"
                    class="btn btn-sm btn-outline-danger"
                    title="Видалити годинник">
@@ -116,4 +158,28 @@
     {% endif %}
 </div>
 
+<script>
+    function copyApiLink(inputId) {
+        const input = document.getElementById(inputId);
+        if (!input) return;
+
+        // робимо тимчасово видимим для копіювання
+        input.removeAttribute("hidden");
+        input.select();
+        input.setSelectionRange(0, 99999);
+
+        try {
+            document.execCommand("copy");
+            // можна замінити alert на toast або спливаюче повідомлення
+            alert("Посилання скопійовано!");
+        } catch (err) {
+            console.error("Не вдалося скопіювати:", err);
+        }
+
+        input.hidden = true; // повертаємо hidden
+    }
+</script>
+
+
 {% endblock %}
+

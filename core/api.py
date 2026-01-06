@@ -175,7 +175,7 @@ def create_clock(request, payload: Optional[CreateClockRequest] = None):
 
 
 # 🟢 RETRIEVE (отримати один годинник)
-@router.get("/clocks/{clock_id}/", response={200: TimeData, 403: ErrorClockResponse})
+@router.get("/clocks/{clock_id}/", response={200: TimeData, 403: ErrorClockResponse}, url_name='api-retrieve-clock')
 def retrieve_clock(request, clock_id: int):
     """
     Retrieve a single clock by ID.
@@ -234,7 +234,7 @@ def list_clocks(request):
     return clocks
 
 
-@router.put("/clocks/", response={200: TimeDataUpdate, 403: ErrorClockResponse})
+@router.put("/clocks/", response={200: TimeDataUpdate, 403: ErrorClockResponse}, url_name='api-update-clock')
 def update_clock(request, payload: ClockUpdateRequest):
     """
     Update clock properties.
