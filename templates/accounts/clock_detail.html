@@ -4,32 +4,7 @@
 
 {% block profile_content %}
 <p><strong>ID:</strong> {{ clock.id }}</p>
-
 <hr>
-{% if requested_user == user_owner %}
-<label for="user_id"><strong>Додати користувачів:</strong></label>
-<input
-        type="text"
-        id="user_id"
-        name="user_id"
-        class="form-control"
-        placeholder="ID або нікнейм користувача"
-        hx-get="{% url 'user_search_by_id' clock.id %}"
-        hx-trigger="keyup delay:300ms"
-        hx-target="#user-search-results"
-        autocomplete="off"
->
-
-<div id="user-search-results" class="mt-2"
-     hx-on="htmx:afterRequest:document.getElementById('user_id').value = ''"
-></div>
-
-<h5>Дозволені користувачі</h5>
-
-<div id="allowed-users-table" class="mt-2">
-    {% include "includes/allowed_users_table.html" %}
-</div>
-{% endif %}
 <form method="post" action="{% url 'clock_control' clock.id %}">
     {% csrf_token %}
     <input type="hidden" name="next" value="{{ request.get_full_path }}">
@@ -85,7 +60,32 @@
 
 </form>
 
+{% if requested_user == user_owner %}
 <hr>
+<label for="user_id"><strong>Додати користувачів:</strong></label>
+<input
+        type="text"
+        id="user_id"
+        name="user_id"
+        class="form-control"
+        placeholder="ID або нікнейм користувача"
+        hx-get="{% url 'user_search_by_id' clock.id %}"
+        hx-trigger="keyup delay:300ms"
+        hx-target="#user-search-results"
+        autocomplete="off"
+>
+
+<div id="user-search-results" class="mt-2"
+     hx-on="htmx:afterRequest:document.getElementById('user_id').value = ''"
+></div>
+
+<h5>Дозволені користувачі</h5>
+
+<div id="allowed-users-table" class="mt-2">
+    {% include "includes/allowed_users_table.html" %}
+</div>
+{% endif %}
+
 <a href="{% url 'profile_clocks' %}" class="btn btn-secondary mt-3">← Назад</a>
 <!-- JS для автоматичного оновлення часу -->
 <script>

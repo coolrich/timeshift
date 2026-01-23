@@ -21,6 +21,7 @@ from django.views.generic import CreateView, TemplateView, ListView, UpdateView,
 
 from core.models import VirtualClock
 from core.services import VirtualClockController
+from accounts.utils.context import clocks_list_context
 from .exceptions import TokenRefreshTooOften
 from .forms import TimeShiftUserCreationForm, UserSettingsForm
 from .services import UserController
@@ -103,18 +104,12 @@ class ProfileClocksView(LoginRequiredMixin, ListView):
         context["shared_clocks"] = dict(grouped)
         logger.debug(f"ProfileClocksView.get_context_data(): shared_count: {shared_count}")
         # logger.debug(f"")
-        clock_api_urls = {
-            clock.id:
-                self.request.build_absolute_uri(
-                    reverse("api-1.0.0:api-retrieve-clock", kwargs={"clock_id": clock.id}))
-            for clock in clocks
-        }
-        context['clock_api_urls_retrieve'] = clock_api_urls
-        context['clock_api_url_update'] = self.request.build_absolute_uri(
-            reverse("api-1.0.0:api-update-clock"))
-        logger.debug(
-            f"accounts.views.ClockDetailView.get_context_data(): clocks={clocks}")
+        context.update(clocks_list_context(self.request, clocks))
+        # logger.debug(
+        #     f"accounts.views.ClockDetailView.get_context_data(): clocks={clocks}")
         return context
+
+
 
 
 class ClockDetailView(LoginRequiredMixin, DetailView):
@@ -256,6 +251,7 @@ class ClockControlView(LoginRequiredMixin, View):
                    "current_time": controller.get_time(),
                    "allowed_users": clock.allowed_users.all(),
                    }
+        # clocks_list_context(self.request, self.get_queryset(), context)
         messages_to_user = []
 
         # --- Назва ---
@@ -285,10 +281,12 @@ class ClockControlView(LoginRequiredMixin, View):
                 controller.toggle_tick()
                 state = "увімкнено" if controller.tick_status else "вимкнено"
                 messages_to_user.append(f"Тікання годинника {state}")
+                context = {"clock": clock}
+                context.update(clocks_list_context(self.request, self.get_queryset()))
                 return render(
                     request,
                     "includes/clock_item.html",
-                    {"clock": clock}
+                    context
                 )
 
         # --- Час ---

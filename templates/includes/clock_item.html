@@ -1,10 +1,30 @@
+{% load custom_tags %}
 <button
-    class="btn btn-sm btn-outline-primary"
-    hx-post="{% url 'clock_control' clock.id %}"
-    hx-vals='{"toggle_tick":"button"}'
-    hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
-    hx-target="#clock-{{ clock.id }}"
-    hx-swap="innerHTML"
-    title="{% if clock.tick_enabled %}Поставити на паузу{% else %}Запустити годинник{% endif %}">
-  {% if clock.tick_enabled %}⏸{% else %}▶{% endif %}
+        class="btn btn-sm btn-outline-primary"
+        hx-post="{% url 'clock_control' clock.id %}"
+        hx-vals='{"toggle_tick":"button"}'
+        hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+        hx-target="#clock-{{ clock.id }}"
+        hx-swap="innerHTML"
+        title="{% if clock.tick_enabled %}Поставити на паузу{% else %}Запустити годинник{% endif %}">
+    {% if clock.tick_enabled %}⏸{% else %}▶{% endif %}
+</button>
+
+<input
+        type="text"
+        id="api-link-retrieve-clock-{{ clock.id }}"
+        value="{{ clock_api_urls_retrieve | dict_get:clock.id }}"
+        readonly
+        hidden
+>
+
+
+<button
+        type="button"
+        class="btn btn-outline-secondary btn-sm"
+        title="Копіювати API-посилання на Retrieve Clock"
+        onclick="copyApiLink('api-link-retrieve-clock-{{ clock.id }}')"
+>
+    <i class="bi bi-clipboard"></i>
+    Retrieve Link
 </button>

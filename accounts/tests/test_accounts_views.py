@@ -1,5 +1,4 @@
 import datetime
-from http.client import responses
 from logging import getLogger
 
 import pytz
@@ -10,7 +9,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from core.models import VirtualClock
-from core.services import VirtualClockController
+from bs4 import BeautifulSoup
 
 logger = getLogger(__name__)
 User = get_user_model()
@@ -95,7 +94,7 @@ class ProfileClocksViewTest(TestCase):
 
     def setUp(self):
         self.user = User.objects.create_user(username="emily", password="verySecret123!", max_clocks_count=10)
-        VirtualClock.objects.create(user_owner=self.user)
+        self.clock = VirtualClock.objects.create(user_owner=self.user)
         self.client.login(username="emily", password="verySecret123!")
         self.url = reverse("profile_clocks")
 
@@ -104,7 +103,40 @@ class ProfileClocksViewTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, "accounts/clocks.html")
         self.assertIn("clocks", response.context)
-        self.assertQuerySetEqual(response.context["clocks"], VirtualClock.objects.filter(user_owner=self.user))
+        clocks = VirtualClock.objects.filter(user_owner=self.user)
+        logger.debug(f"accounts.tests.test_accounts_views.ProfileClocksViewTest.test_profile_clocks_context: "
+                     f"context: {response.context["clocks"]} "
+                     f"VirtualClock.objects.filter(user_owner=self.user): "
+                     f"{clocks}")
+        self.assertQuerySetEqual(response.context["clocks"], clocks)
+
+    def test_profile_clocks_get_renders_template(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "accounts/clocks.html")
+        self.assertContains(
+            response,
+            f'id="api-link-retrieve-clock-{self.clock.id}"',
+            1
+        )
+        self.assertContains(
+            response,
+            f'Retrieve Link',
+            1
+        )
+        soup = BeautifulSoup(response.content, "html.parser")
+        button = soup.find(
+            "button",
+            attrs={
+                "onclick": f"copyApiLink('api-link-retrieve-clock-{self.clock.id}')"
+            }
+        )
+        self.assertIsNotNone(button)
+
+        expected_href = reverse("clock_delete", args=[self.clock.id])
+        link = soup.find("a", href=expected_href)
+        self.assertIsNotNone(link)
+        self.assertContains(response, link.text)
 
 
 class ClockDetailViewTest(TestCase):
@@ -304,6 +336,7 @@ class ClockControlViewTest(TestCase):
         self.assertEqual(VirtualClock.objects.count(), 1)
         self.assertNotEqual(VirtualClock.objects.first().tick_enabled, old_state)
 
+
     def test_post_toggle_tick_button(self):
         old_state = self.clock.tick_enabled
         response = self.client.post(self.url, data={'toggle_tick': 'button'}, follow=True, HTTP_HX_REQUEST=True)
@@ -391,9 +424,9 @@ class ClockControlViewTest(TestCase):
     def test_post_set_non_valid_speed(self):
         validators = self.clock._meta.get_field("speed").validators
         with self.assertRaises(ValidationError):
-            response = self.client.post(self.url, data={'clock_speed': validators[1].limit_value+1,
-                                                    'next': self.next},
-                                    follow=True)
+            response = self.client.post(self.url, data={'clock_speed': validators[1].limit_value + 1,
+                                                        'next': self.next},
+                                        follow=True)
 
     def test_get_current_time(self):
         r = self.client.get(self.url)
