@@ -11,7 +11,6 @@ from django.db.models import QuerySet
 from django.utils import timezone
 from ninja.errors import HttpError
 
-from accounts.models import TimeShiftUser
 from .models import VirtualClock
 
 User = get_user_model()
@@ -173,7 +172,7 @@ class VirtualClockController:
             if full_clean:
                 await sync_to_async(self._virtual_clock.full_clean)()
         except ValidationError as e:
-            raise HttpError(422,  e.message_dict['speed'][0] if hasattr(e, "message_dict") else e.messages)
+            raise HttpError(422, e.message_dict['speed'][0] if hasattr(e, "message_dict") else e.messages)
 
         # Збереження через асинхронний save
         if save:
@@ -184,19 +183,38 @@ class VirtualClockController:
     def get_clock_speed(self) -> float:
         return self._virtual_clock.speed
 
-    async def set_real_time(self, save: bool = True) -> Type['VirtualClockController']:
+    def set_real_time(self, tick_enabled: bool = False, save: bool = True) -> Type['VirtualClockController']:
         """
         Set the virtual clock to the current real time and stop the tick.
 
         Args:
             save (bool): automatically save to database if True
+            tick_enabled (bool): turn on/off clock's tick
         Returns:
             VirtualClock: The updated VirtualClock instance.
         """
         now = timezone.now()
         self._virtual_clock.current_time = now
         self._virtual_clock.last_updated = now
-        self._virtual_clock.tick_enabled = False
+        self._virtual_clock.tick_enabled = tick_enabled
+        if save:
+            self.save()
+        return self
+
+    async def set_real_time_async(self, tick_enabled: bool = False, save: bool = True) -> Type['VirtualClockController']:
+        """
+        Set the virtual clock to the current real time and stop the tick.
+
+        Args:
+            save (bool): automatically save to database if True
+            tick_enabled (bool): turn on/off clock's tick
+        Returns:
+            VirtualClock: The updated VirtualClock instance.
+        """
+        now = timezone.now()
+        self._virtual_clock.current_time = now
+        self._virtual_clock.last_updated = now
+        self._virtual_clock.tick_enabled = tick_enabled
         if save:
             await self.save_async()
         return self
@@ -284,7 +302,8 @@ class VirtualClockController:
             QuerySet[VirtualClock]: A queryset containing all virtual clocks
             owned by the user or shared with the user.
         """
-        return await sync_to_async(VirtualClock.objects.filter)(user_owner=user) | await sync_to_async(user.shared_clocks.all)()
+        return await sync_to_async(VirtualClock.objects.filter)(user_owner=user) | await sync_to_async(
+            user.shared_clocks.all)()
 
     def delete(self, user: User) -> Type['VirtualClockController']:
         """
@@ -354,17 +373,17 @@ class VirtualClockController:
 
         # Full update of allowed users
         if "allowed_users" in payload and payload["allowed_users"]:
-            users = TimeShiftUser.objects.filter(id__in=payload["allowed_users"])
+            users = User.objects.filter(id__in=payload["allowed_users"])
             self._virtual_clock.allowed_users.set(users)
 
         # Add users to existing allowed users
         if "add_users" in payload and payload["add_users"]:
-            users = TimeShiftUser.objects.filter(id__in=payload["add_users"])
+            users = User.objects.filter(id__in=payload["add_users"])
             self._virtual_clock.allowed_users.add(*users)
 
         # Removing users
         if "remove_users" in payload and payload["remove_users"]:
-            users = TimeShiftUser.objects.filter(id__in=payload["remove_users"])
+            users = User.objects.filter(id__in=payload["remove_users"])
             self._virtual_clock.allowed_users.remove(*users)
 
         if save:
@@ -373,7 +392,7 @@ class VirtualClockController:
         return self
 
     async def update_allowed_users_async(
-        self, payload: dict, save: bool = True
+            self, payload: dict, save: bool = True
     ) -> Type["VirtualClockController"]:
         """
         Update the list of users who have access to this virtual clock asynchronously.
@@ -381,14 +400,16 @@ class VirtualClockController:
 
         # Full update of allowed users
         if "allowed_users" in payload and payload["allowed_users"]:
-            users = await sync_to_async(TimeShiftUser.objects.filter(
+            users = await sync_to_async(User.objects.filter(
                 id__in=payload["allowed_users"]
             ).all)()  # отримуємо список асинхронно
+            users = [user async for user in users]
+            logger.info(f"core.services.VirtualClockController.update_allowed_users(): set allowed_users: {users}")
             await self._virtual_clock.allowed_users.aset(users)  # async set
 
         # Add users to existing allowed users
         if "add_users" in payload and payload["add_users"]:
-            users = await sync_to_async(TimeShiftUser.objects.filter(
+            users = await sync_to_async(User.objects.filter(
                 id__in=payload["add_users"]
             ).all)()
             users = [user async for user in users]
@@ -397,13 +418,12 @@ class VirtualClockController:
 
         # Remove users
         if "remove_users" in payload and payload["remove_users"]:
-            users = await sync_to_async(TimeShiftUser.objects.filter(
+            users = await sync_to_async(User.objects.filter(
                 id__in=payload["remove_users"]
             ).all)()
             users = [user async for user in users]
             logger.info(f"core.services.VirtualClockController.update_allowed_users(): remove_users: {users}")
             await sync_to_async(self._virtual_clock.allowed_users.remove)(*users)
-
 
         # Save changes if needed
         if save:
@@ -445,5 +465,3 @@ class VirtualClockController:
             raise IntegrityError("Owner cannot be in allowed_users.")
 
         return clock
-
-

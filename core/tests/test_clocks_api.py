@@ -1,7 +1,10 @@
+import asyncio
 import logging
 
 import pytest
+from asgiref.sync import sync_to_async
 from django.contrib.auth import get_user_model
+from django.db import transaction
 from ninja import NinjaAPI
 from ninja.testing import TestAsyncClient
 
@@ -21,7 +24,8 @@ class TestClockAsyncAPI:
     @pytest.fixture(scope="class", autouse=True)
     def init_api(self, request):
         api = NinjaAPI(auth=SessionOrToken(), version="test")
-        api.add_router("/clocks/", create_clock_router())
+        request.cls.router = create_clock_router()
+        api.add_router("/clocks/", router=request.cls.router)
 
         request.cls.api = api
         request.cls.client = TestAsyncClient(api)
@@ -36,9 +40,18 @@ class TestClockAsyncAPI:
             max_clocks_count=10
         )
 
+        self.stranger_user = await User.objects.acreate_user(
+            username="strangeruser",
+            password="testpass",
+            email="strangeruser@example.com",
+            phone_number="+380969817210",
+            max_clocks_count=10
+        )
+
         self.clock1 = await VirtualClock.objects.acreate(
             user_owner=self.user,
             name="Old Name",
+            # allowed_users=[self.stranger_user],
             tick_enabled=False,
             speed=1.0
         )
@@ -54,13 +67,51 @@ class TestClockAsyncAPI:
             tick_enabled=True,
             speed=2.0
         )
-
+        await asyncio.sleep(0)
         self.auth_headers = {
             "Authorization": f"Bearer {self.user.api_token}"
         }
-
+        # await self.clock1.allowed_users.aadd(self.stranger_user.id)
+        # logger.debug(f"core.TestClockAsyncAPI.setup():"
+        #              f"clock1.allowed_users: {self.clock1.allowed_users}")
         yield
         # cleanup не потрібен
+
+    async def test_set_real_time_for_owner(self):
+        response = await self.client.post(
+            "/clocks/setreal",
+            json={"clock_id": self.clock1.id},
+            headers=self.auth_headers
+        )
+        payload = response.json()
+        expected = {'status','data', 'message'}
+        assert expected == set(payload), f"Expected keys {expected}, got {set(payload)}"
+        assert response.status_code == 200
+        await self.clock1.arefresh_from_db()
+        assert self.clock1.tick_enabled is False
+
+    async def test_set_real_time_for_non_owner(self):
+        # 1. Додаємо stranger_user у allowed_users через ORM
+        clock = await VirtualClock.objects.aget(id=self.clock1.id)
+        await clock.allowed_users.aadd(self.stranger_user)
+
+        # 2. stranger_user викликає setreal
+        response = await self.client.post(
+            "/clocks/setreal",
+            json={"clock_id": clock.id},
+            headers={"Authorization": f"Bearer {self.stranger_user.api_token}"},
+        )
+
+        # 3. Перевірка відповіді API
+        payload = response.json()
+        expected_keys = {"status", "data", "message"}
+        assert response.status_code == 200
+        assert payload["status"] == "success"
+        assert set(payload) == expected_keys
+
+        # 4. Перевірка, що tick_enabled НЕ змінився
+        clock_fresh = await VirtualClock.objects.aget(id=clock.id)
+        assert clock_fresh.tick_enabled is False
 
     async def test_create_clock_with_payload(self):
         response = await self.client.post(

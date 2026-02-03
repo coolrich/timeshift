@@ -9,6 +9,7 @@ from ninja import Schema
 
 class BaseClockRequest(Schema):
     clock_id: int
+    tick_enabled: bool = False
 
 class TimeRequest(Schema):
     time: str  # ISO 8601, наприклад: "2025-08-22T10:15:00+00:00"
@@ -22,16 +23,18 @@ class TickSetRequest(Schema):
 
 # Базова схема з усіма полями
 class BaseClockSchema(Schema):
+    user_owner_id: int
     clock_id: int
     name: str | None
     time: str
     speed: float
-    allowed_users: Optional[List[int] | Tuple[int]] = None
     tick_enabled: bool
+
 
 # Схема для відповіді (всі поля обов'язкові)
 class TimeData(BaseClockSchema):
-    user_owner_id: int
+    allowed_users: Optional[List[int] | Tuple[int]] = None
+
 
 class TimeDataUpdate(Schema):
     clock_id: Optional[int] = None

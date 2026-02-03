@@ -370,7 +370,7 @@ class ClockControlView(LoginRequiredMixin, View):
                     username = remove_user.username
                     logger.debug(f"ClockControlView.post(): remove user:"
                                  f" username {username} ID {remove_user_id}")
-                    controller.update_allowed_users_async({'remove_users': [remove_user_id]})
+                    controller.update_allowed_users({'remove_users': [remove_user_id]})
                     m = f"Користувача {username} з ID {remove_user_id} видалено"
                     messages_to_user.append(m)
                     messages.error(request, m)

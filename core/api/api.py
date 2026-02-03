@@ -1,5 +1,5 @@
 from logging import getLogger
-from typing import Optional, List
+from typing import Optional, List, Union
 
 from asgiref.sync import sync_to_async
 from django.contrib.auth import get_user_model
@@ -11,7 +11,7 @@ from ninja.errors import HttpError
 from core.schemas import (
     TimeData, VirtualClockInfo, ClockUpdateRequest,
     CreateClockRequest, TimeDataUpdate, ErrorClockResponse,
-    BaseClockRequest, TimeResponse
+    BaseClockRequest, TimeResponse, BaseClockSchema
 )
 from core.services import VirtualClockController
 from core.utils import TimeService
@@ -28,11 +28,15 @@ async def get_v_clock_controller(
     user = request.auth
     clock = await user.virtual_clocks.filter(id=clock_id) \
         .prefetch_related("allowed_users") \
+        .select_related("user_owner") \
         .afirst()
 
     if not clock:
-        logger.info(f"Clock not found or not accessible: {clock_id} for user {user.id}")
-        raise HttpError(status_code=404, message="Not found")
+        logger.debug(f"Clock {clock_id} not found for user {user.id}")
+        clock = await user.shared_clocks.select_related("user_owner").filter(id=clock_id).afirst()
+        if not clock:
+            raise HttpError(status_code=404, message="Not found")
+        logger.debug(f"Shared clock {clock_id} found for user {user.id} of owner {clock.user_owner_id}")
 
     if clock.user_owner != user:
         allowed = await clock.allowed_users.filter(id=user.id).aexists()
@@ -58,24 +62,40 @@ def create_clock_router() -> Router:
         async def test_route(request):
             return {"message": "Hello from test route!"}
 
-    @router.post("/setreal", response={200: TimeResponse, 403: ErrorClockResponse})
+    @router.post("/setreal", response={200: Union[TimeResponse | BaseClockSchema], 403: ErrorClockResponse})
     async def set_real(request, payload: BaseClockRequest):
         clock_id = payload.clock_id
         controller, user = await get_v_clock_controller(request, clock_id)
-        await controller.set_real_time()
-        return {
-            "status": "success",
-            "data": TimeData(
-                clock_id=controller.virtual_clock.id,
-                user_owner_id=controller.get_user_owner().id,
-                name=controller.virtual_clock.name,
-                time=controller.get_iso_time(),
-                tick_enabled=controller.tick_status,
-                speed=controller.get_clock_speed(),
-                allowed_users=list(await controller.virtual_clock.allowed_users.values_list("id", flat=True)),
-            ),
-            "message": "Time set to real time"
-        }
+        await controller.set_real_time_async(tick_enabled=payload.tick_enabled)
+        if controller.get_user_owner() == user:
+            allowed_users = [user_id async for user_id in
+                             controller.virtual_clock.allowed_users.values_list("id", flat=True)]
+            return {
+                "status": "success",
+                "data": TimeData(
+                    clock_id=controller.virtual_clock.id,
+                    user_owner_id=controller.get_user_owner().id,
+                    name=controller.virtual_clock.name,
+                    time=controller.get_iso_time(),
+                    tick_enabled=controller.tick_status,
+                    speed=controller.get_clock_speed(),
+                    allowed_users=list(allowed_users),
+                ),
+                "message": "Time set to real time"
+            }
+        else:
+            return {
+                "status": "success",
+                "data": BaseClockSchema(
+                    clock_id=controller.virtual_clock.id,
+                    user_owner_id=controller.get_user_owner().id,
+                    name=controller.virtual_clock.name,
+                    time=controller.get_iso_time(),
+                    tick_enabled=controller.tick_status,
+                    speed=controller.get_clock_speed(),
+                ),
+                "message": "Time set to real time"
+            }
 
     @router.post("", response={201: VirtualClockInfo, 403: ErrorClockResponse})
     async def create_clock(request, payload: Optional[CreateClockRequest] = None):
@@ -97,7 +117,7 @@ def create_clock_router() -> Router:
     async def retrieve_clock(request, clock_id: int):
         controller, user = await get_v_clock_controller(request, clock_id)
         allowed_users = [user_id async for user_id in controller.virtual_clock.allowed_users.
-                                                                values_list("id", flat=True)]
+        values_list("id", flat=True)]
         return TimeData(
             clock_id=controller.virtual_clock.id,
             user_owner_id=controller.get_user_owner().id,
@@ -184,14 +204,14 @@ def create_clock_router() -> Router:
 
         await controller.save_async()
 
+        allowed_users = [user_id async for user_id in clock.allowed_users.values_list("id", flat=True)]
         return TimeDataUpdate(
             clock_id=clock.id,
             name=clock.name if "name" in changed_fields else None,
             time=controller.get_iso_time() if "time" in changed_fields else None,
             speed=controller.get_clock_speed() if "speed" in changed_fields else None,
             tick_enabled=controller.tick_status if "tick_enabled" in changed_fields else None,
-            allowed_users=list(
-                await clock.allowed_users.values_list("id", flat=True)) if "allowed_users" in changed_fields else None,
+            allowed_users=allowed_users if "allowed_users" in changed_fields else None,
             changed_fields=changed_fields
         )
 

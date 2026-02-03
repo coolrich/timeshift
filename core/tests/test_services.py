@@ -62,7 +62,7 @@ class TestVirtualClockController(TransactionTestCase):
         Перевіряємо, що set_real_time() встановлює поточний (заморожений) час
         та вимикає tick.
         """
-        updated_clock = await self.controller.set_real_time()
+        updated_clock = await self.controller.set_real_time_async()
         time_dt = datetime.fromisoformat(self.controller.get_iso_time())
         expected_time = dj_timezone.now()
 
