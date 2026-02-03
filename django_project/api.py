@@ -1,12 +1,15 @@
 from ninja import NinjaAPI
 
-from accounts import api as accounts_api
-from core import api as core_api
+from accounts.api.api import create_user_router
+from core.api.api import create_clock_router
 from core.auth import SessionOrToken
 
 api = NinjaAPI(auth=SessionOrToken(),
                title="TimeShift API",
                description="TimeShift API",
                version="1.0.0")
-api.add_router("/user", accounts_api.router, tags=["User"])
-api.add_router("/clock", core_api.router, tags=["Clock"])
+
+user_router = create_user_router()
+clocks_router = create_clock_router()
+api.add_router("/user/", user_router, tags=["User"])
+api.add_router("/clocks/", clocks_router, tags=["Clock"])

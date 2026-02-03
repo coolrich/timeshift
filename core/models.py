@@ -59,14 +59,6 @@ class VirtualClock(models.Model):
                 clock.delete()
             raise IntegrityError("User has reached the maximum number of clocks.")
 
-        # if not self.api_token:
-        #     while True:
-        #         token = secrets.token_urlsafe(32)
-        #         if not VirtualClock.objects.filter(api_token=token).exists():
-        #             self.api_token = token
-        #             logger.info(f"core.models.VirtualClock.save(): new api_token created: {self.api_token}")
-        #             break
-
         last = VirtualClock.objects.all().order_by("-id").first()
         logger.debug(f"core.models.VirtualClock.save(): last: {last}")
         if not last:
@@ -79,6 +71,8 @@ class VirtualClock(models.Model):
                 self.id = int(last.id) + 1
         logger.debug(f"core.models.VirtualClock.save(): self.id is {self.id} | name: {self.name} | tick_enabled: {self.tick_enabled}")
         super().save(*args, **kwargs)
+
+
 
     class Meta:
         ordering = ["id"]

@@ -10,7 +10,6 @@ logger = getLogger(__name__)
 User = get_user_model()
 
 class ClockTests(TestCase):
-
     def setUp(self):
         self.user = User.objects.create_user(username="emily",
                                              password="emilypass",
@@ -24,3 +23,8 @@ class ClockTests(TestCase):
             self.clock = VirtualClock.objects.create(user_owner=self.user)
         logger.debug(f"ClockTests.test_users_clock_limit(): len(self.user.virtual_clocks): {self.user.virtual_clocks.count()}")
         self.assertEqual(self.user.virtual_clocks.count(), 1)
+
+    async def test_speed_min_max_vals(self):
+        validators = self.clock._meta.get_field("speed").validators
+        assert validators[0].limit_value == 0.01
+        assert validators[1].limit_value == 100.0

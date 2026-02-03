@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional, List, Tuple
 
 from ninja import Schema
 
@@ -26,7 +26,7 @@ class BaseClockSchema(Schema):
     name: str | None
     time: str
     speed: float
-    allowed_users: Optional[List[int]] = None
+    allowed_users: Optional[List[int] | Tuple[int]] = None
     tick_enabled: bool
 
 # Схема для відповіді (всі поля обов'язкові)

@@ -9,6 +9,7 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth import login
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.db.models import Q
 from django.http import HttpResponse, JsonResponse
@@ -160,7 +161,7 @@ class ClockCreateView(LoginRequiredMixin, CreateView):
         try:
             return super().form_valid(form)
         except IntegrityError as e:
-            logger.error(f"ClockCreateView.form_valid(): IntegrityError: {e}")
+            logger.info(f"ClockCreateView.form_valid(): IntegrityError: {e}")
             messages.warning(self.request, "Не вдалося створити годинник. Перевищено ліміт годинників.")
             return redirect("profile_clocks")
 
@@ -316,9 +317,14 @@ class ClockControlView(LoginRequiredMixin, View):
         new_speed = request.POST.get("clock_speed")
         logger.debug(f"accounts.views.ClockControlView.post(): old_speed: {old_speed} new_speed: {new_speed}")
         if new_speed and old_speed != float(new_speed):
-            controller.set_clock_speed(new_speed, save=False)
-            logger.debug(f"accounts.views.ClockControlView.post(): set speed multiplier to: {new_speed}")
-            messages.info(request, f"Змінений коефіцієнт швидкості на {new_speed}")
+            try:
+                controller.set_clock_speed(new_speed, save=False)
+                logger.debug(f"accounts.views.ClockControlView.post(): set speed multiplier to: {new_speed}")
+                messages.info(request, f"Змінений коефіцієнт швидкості на {new_speed}")
+            except ValidationError as e:
+                logger.debug(f"accounts.views.ClockControlView.post(): exception: speed out of limit:{new_speed}")
+                messages.error(request,
+                               e.message_dict['speed'][0] if hasattr(e, "message_dict") else e.messages)
 
         # --- Додати користувачів ---
         if self.request.user == clock.user_owner:
@@ -364,7 +370,7 @@ class ClockControlView(LoginRequiredMixin, View):
                     username = remove_user.username
                     logger.debug(f"ClockControlView.post(): remove user:"
                                  f" username {username} ID {remove_user_id}")
-                    controller.update_allowed_users({'remove_users': [remove_user_id]})
+                    controller.update_allowed_users_async({'remove_users': [remove_user_id]})
                     m = f"Користувача {username} з ID {remove_user_id} видалено"
                     messages_to_user.append(m)
                     messages.error(request, m)

@@ -1,4 +1,5 @@
 import logging
+from typing import Type
 
 from django.contrib.auth import get_user_model
 from django.utils import timezone
@@ -23,18 +24,20 @@ class UserController:
     def api_token(self) -> str:
         return self._user.api_token
 
-    def update_token(self) -> User:
+    def update_token(self, save: bool = True) -> Type['UserController']:
         now = timezone.now()
 
-        if self.user.token_last_refreshed_at:
-            delta = now - self.user.token_last_refreshed_at
+        if self._user.token_last_refreshed_at:
+            delta = now - self._user.token_last_refreshed_at
             if delta < User._TOKEN_REFRESH_COOLDOWN:
                 raise TokenRefreshTooOften(
                     retry_after=User._TOKEN_REFRESH_COOLDOWN - delta
                 )
-        self.user.refresh_token()
-        return self._user
+        self._user.refresh_token()
+        if save:
+            self._user.save()
+        return self
 
     def save(self):
-        self.user.save()
-        return self._user
+        self._user.save()
+        return self

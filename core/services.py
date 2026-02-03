@@ -2,8 +2,11 @@ from datetime import timezone, timedelta, datetime
 from logging import getLogger
 from typing import Any, Type
 from zoneinfo import ZoneInfo
+from asgiref.sync import sync_to_async
 
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
+from django.db import IntegrityError
 from django.db.models import QuerySet
 from django.utils import timezone
 from ninja.errors import HttpError
@@ -21,6 +24,7 @@ class VirtualClockController:
     Controller class for managing virtual clock operations.
     Handles time manipulation, tick control, and clock configuration.
     """
+
     def __init__(self, virtual_clock: VirtualClock):
         """
         Initialize the VirtualClockController with a VirtualClock instance.
@@ -40,6 +44,16 @@ class VirtualClockController:
         """
         return self._virtual_clock
 
+    # @property
+    # async def virtual_clock_async(self) -> VirtualClock:
+    #     """
+    #     Get the virtual clock instance.
+    #
+    #     Returns:
+    #         VirtualClock: The virtual clock instance being controlled
+    #     """
+    #     return self._virtual_clock
+
     def _current_time(self) -> timedelta | datetime | Any:
         """
         Calculate the current virtual time in memory without saving to the database.
@@ -51,7 +65,7 @@ class VirtualClockController:
         if self._virtual_clock.tick_enabled:
             now = timezone.now()
             delta = now - self._virtual_clock.last_updated
-            return self._virtual_clock.current_time + delta*self._virtual_clock.speed
+            return self._virtual_clock.current_time + delta * self._virtual_clock.speed
         return self._virtual_clock.current_time
 
     def get_iso_time(self) -> str:
@@ -81,13 +95,23 @@ class VirtualClockController:
     def get_user_owner(self) -> User:
         """
         Get the owner of the virtual clock.
-        
+
         Returns:
             User: The user who owns this virtual clock
         """
         return self._virtual_clock.user_owner
 
-    def set_time(self, new_time: datetime, save: bool=True, tick_auto_pause: bool=True) -> Type['VirtualClockController']:
+    # async def get_user_owner_async(self) -> User:
+    #     """
+    #     Get the owner of the virtual clock.
+    #
+    #     Returns:
+    #         User: The user who owns this virtual clock
+    #     """
+    #     return self._virtual_clock.user_owner
+
+    def set_time(self, new_time: datetime, save: bool = True, tick_auto_pause: bool = True) -> Type[
+        'VirtualClockController']:
         """
         Set the virtual clock to a specific time and stop the tick.
 
@@ -108,7 +132,7 @@ class VirtualClockController:
             self.save()
         return self
 
-    def set_clock_speed(self, new_speed:float, save=True, full_clean:bool=True):
+    def set_clock_speed(self, new_speed: float, save=True, full_clean: bool = True):
         try:
             new_speed = float(new_speed)
         except ValueError:
@@ -120,14 +144,47 @@ class VirtualClockController:
         self._virtual_clock.speed = new_speed
         if save:
             self._virtual_clock.save()
+        # try:
         if full_clean:
             self._virtual_clock.full_clean()
+        # except ValidationError as e:
+        #     raise HttpError(422, e.message_dict['speed'][0] if hasattr(e, "message_dict") else e.messages)
+        return self
+
+    async def set_clock_speed_async(self, new_speed: float, save=True, full_clean: bool = True):
+        """
+        Асинхронно встановлює швидкість віртуального годинника.
+        Використовує asave() для збереження та sync_to_async для full_clean().
+        """
+        # Перевіряємо, що new_speed число
+        try:
+            new_speed = float(new_speed)
+        except ValueError:
+            raise HttpError(400, "Invalid speed value")
+
+        # Оновлюємо час та швидкість в пам’яті
+        now = timezone.now()
+        self._virtual_clock.current_time = self._current_time()
+        self._virtual_clock.last_updated = now
+        self._virtual_clock.speed = new_speed
+
+        # Повна перевірка валідності (full_clean) через sync_to_async
+        try:
+            if full_clean:
+                await sync_to_async(self._virtual_clock.full_clean)()
+        except ValidationError as e:
+            raise HttpError(422,  e.message_dict['speed'][0] if hasattr(e, "message_dict") else e.messages)
+
+        # Збереження через асинхронний save
+        if save:
+            await self._virtual_clock.asave()
+
         return self
 
     def get_clock_speed(self) -> float:
         return self._virtual_clock.speed
 
-    def set_real_time(self, save: bool=True) -> Type['VirtualClockController']:
+    async def set_real_time(self, save: bool = True) -> Type['VirtualClockController']:
         """
         Set the virtual clock to the current real time and stop the tick.
 
@@ -141,12 +198,10 @@ class VirtualClockController:
         self._virtual_clock.last_updated = now
         self._virtual_clock.tick_enabled = False
         if save:
-            self.save()
+            await self.save_async()
         return self
 
-
-
-    def toggle_tick(self, enabled: bool = None, save: bool=True) -> Type['VirtualClockController']:
+    def toggle_tick(self, enabled: bool = None, save: bool = True) -> Type['VirtualClockController']:
         """
         Toggle or set the tick status of the virtual clock.
         
@@ -167,7 +222,7 @@ class VirtualClockController:
             self.save()
         return self
 
-    def set_clock_name(self, new_name: str, save: bool=True) -> Type['VirtualClockController']:
+    def set_clock_name(self, new_name: str, save: bool = True) -> Type['VirtualClockController']:
         """
         Повертає оновлений об'єкт VirtualClockController.
 
@@ -193,6 +248,15 @@ class VirtualClockController:
         self._virtual_clock.save()
         return self
 
+    async def save_async(self):
+        """
+        Save the current state of the virtual clock to the database asynchronously.
+
+        Returns:
+            VirtualClock: The saved VirtualClock instance.
+        """
+        await self._virtual_clock.asave()
+
     # retrieve a list of clocks
     @staticmethod
     def list_clocks(user: User) -> QuerySet[VirtualClock]:
@@ -208,6 +272,19 @@ class VirtualClockController:
         """
         return VirtualClock.objects.filter(user_owner=user) | user.shared_clocks.all()
 
+    @staticmethod
+    async def alist_clocks(user: User) -> QuerySet[VirtualClock]:
+        """
+        Asynchronously get all virtual clocks visible to the specified user.
+
+        Args:
+            user (User): The user whose clocks to retrieve.
+
+        Returns:
+            QuerySet[VirtualClock]: A queryset containing all virtual clocks
+            owned by the user or shared with the user.
+        """
+        return await sync_to_async(VirtualClock.objects.filter)(user_owner=user) | await sync_to_async(user.shared_clocks.all)()
 
     def delete(self, user: User) -> Type['VirtualClockController']:
         """
@@ -220,6 +297,18 @@ class VirtualClockController:
             raise HttpError(403, "You are not the owner of this clock")
         self._virtual_clock.delete()
         return self
+
+    async def delete_async(self, user: User):
+        """
+        Delete the specified clock instance.
+
+        Args:
+            user (User): The user who owns the clock to delete.
+        """
+
+        if self._virtual_clock.user_owner != user:
+            raise HttpError(403, "You are not the owner of this clock")
+        await sync_to_async(self._virtual_clock.delete)()
 
     @property
     def clock_name(self) -> str:
@@ -235,15 +324,15 @@ class VirtualClockController:
         """
         return self._virtual_clock.tick_enabled
 
-    def update_allowed_users(self, payload: dict, save: bool=True) -> Type['VirtualClockController']:
+    def update_allowed_users(self, payload: dict, save: bool = True) -> Type['VirtualClockController']:
         """
         Update the list of users who have access to this virtual clock.
-        
+
         The payload can contain one or more of the following keys:
         - "allowed_users": List of user IDs to completely replace the current access list
         - "add_users": List of user IDs to add to the current access list
         - "remove_users": List of user IDs to remove from the current access list
-        
+
         Args:
             payload (dict): Dictionary containing update instructions.
             save (bool): automatically save to database if True
@@ -254,7 +343,7 @@ class VirtualClockController:
         # Full update of allowed users
         # if 'allowed_users' in payload:
         #     self._virtual_clock.allowed_users.set(payload['allowed_users'])
-            
+
         # Add users to existing allowed users
         # if 'add_users' in payload and payload['add_users']:
         #     self._virtual_clock.allowed_users.add(*payload['add_users'])
@@ -282,3 +371,79 @@ class VirtualClockController:
             self.save()
 
         return self
+
+    async def update_allowed_users_async(
+        self, payload: dict, save: bool = True
+    ) -> Type["VirtualClockController"]:
+        """
+        Update the list of users who have access to this virtual clock asynchronously.
+        """
+
+        # Full update of allowed users
+        if "allowed_users" in payload and payload["allowed_users"]:
+            users = await sync_to_async(TimeShiftUser.objects.filter(
+                id__in=payload["allowed_users"]
+            ).all)()  # отримуємо список асинхронно
+            await self._virtual_clock.allowed_users.aset(users)  # async set
+
+        # Add users to existing allowed users
+        if "add_users" in payload and payload["add_users"]:
+            users = await sync_to_async(TimeShiftUser.objects.filter(
+                id__in=payload["add_users"]
+            ).all)()
+            users = [user async for user in users]
+            logger.info(f"core.services.VirtualClockController.update_allowed_users(): add_users: {users}")
+            await self._virtual_clock.allowed_users.aadd(*users)  # async add
+
+        # Remove users
+        if "remove_users" in payload and payload["remove_users"]:
+            users = await sync_to_async(TimeShiftUser.objects.filter(
+                id__in=payload["remove_users"]
+            ).all)()
+            users = [user async for user in users]
+            logger.info(f"core.services.VirtualClockController.update_allowed_users(): remove_users: {users}")
+            await sync_to_async(self._virtual_clock.allowed_users.remove)(*users)
+
+
+        # Save changes if needed
+        if save:
+            await self._virtual_clock.asave()  # async save
+
+        return self
+
+    @staticmethod
+    async def create_clock_async(user, name: str | None = None) -> VirtualClock:
+        """
+        Async-safe creation of a VirtualClock with:
+        - max_clocks_count check
+        - owner not in allowed_users
+        - safe id generation
+        """
+        # 1️⃣ Перевіряємо, скільки годинників у користувача
+        current_count = await user.virtual_clocks.acount()
+        max_count = getattr(user, "max_clocks_count", 1)
+
+        if current_count >= max_count:
+            raise IntegrityError("User has reached the maximum number of clocks.")
+
+        # 2️⃣ Генеруємо новий id без блокувань
+        last_clock = await VirtualClock.objects.order_by("-id").afirst()
+        new_id = 1 if not last_clock else last_clock.id + 1
+
+        # 3️⃣ Створюємо новий годинник асинхронно
+        clock = await VirtualClock.objects.acreate(
+            id=new_id,
+            user_owner=user,
+            name=name
+        )
+
+        # 4️⃣ Додатковий чек: власник не повинен бути в allowed_users
+        owner_in_allowed = await clock.allowed_users.filter(pk=user.pk).aexists()
+        if owner_in_allowed:
+            # Виправляємо стан, видаляючи власника з allowed_users
+            await sync_to_async(clock.allowed_users.remove)(user)
+            raise IntegrityError("Owner cannot be in allowed_users.")
+
+        return clock
+
+

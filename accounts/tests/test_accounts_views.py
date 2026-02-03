@@ -356,6 +356,7 @@ class ClockControlViewTest(TestCase):
         response = self.client.post(self.url, data={'add_user_id': self.user1.id})
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, "includes/allowed_users_table.html")
+        logger.debug(f"Response: {response.content.decode()}")
         self.assertContains(response, self.user1.username)
         # logger.debug(f"Response: {response.content.decode()}")
         self.assertContains(response, f"Забрати доступ")
@@ -423,10 +424,14 @@ class ClockControlViewTest(TestCase):
 
     def test_post_set_non_valid_speed(self):
         validators = self.clock._meta.get_field("speed").validators
-        with self.assertRaises(ValidationError):
-            response = self.client.post(self.url, data={'clock_speed': validators[1].limit_value + 1,
+        # with self.assertRaises(ValidationError):
+        response = self.client.post(self.url, data={'clock_speed': validators[1].limit_value + 1,
                                                         'next': self.next},
                                         follow=True)
+        message = list(get_messages(response.wsgi_request))[0]
+        logger.debug(f"accounts.tests.test_accounts_views.ClockControlViewTest."
+                     f"test_post_set_non_valid_speed(): messages: {message}")
+        assert "Переконайтеся, що це значення менше чи дорівнює 100.0." == message.message
 
     def test_get_current_time(self):
         r = self.client.get(self.url)

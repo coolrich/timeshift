@@ -2,6 +2,7 @@ import logging
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
+from asgiref.sync import sync_to_async
 from django.contrib.auth import get_user_model
 from django.test import TransactionTestCase
 from django.utils import timezone as dj_timezone
@@ -56,12 +57,12 @@ class TestVirtualClockController(TransactionTestCase):
         time_dt = datetime.fromisoformat(time_iso)
         self.assertEqual(time_dt, manual_time)
 
-    def test_set_real_time(self):
+    async def test_set_real_time(self):
         """
         Перевіряємо, що set_real_time() встановлює поточний (заморожений) час
         та вимикає tick.
         """
-        updated_clock = self.controller.set_real_time()
+        updated_clock = await self.controller.set_real_time()
         time_dt = datetime.fromisoformat(self.controller.get_iso_time())
         expected_time = dj_timezone.now()
 
@@ -99,48 +100,52 @@ class TestVirtualClockController(TransactionTestCase):
         self.assertEqual(updated_clock.last_updated, dj_timezone.now())
         self.assertEqual(updated_clock.current_time, self.controller._current_time())
 
-    def test_update_allowed_users_full_update(self):
-        another_user = User.objects.create_user(username='another', password='VeryStrongPass!@#')
-        another_user1 = User.objects.create_user(username='another1', password='iIfDYIGPBikpui%^')
+    async def test_update_allowed_users_full_update(self):
+        another_user = await User.objects.acreate(username='another', password='VeryStrongPass!@#')
+        another_user1 = await User.objects.acreate(username='another1', password='iIfDYIGPBikpui%^')
         payload = {
             'allowed_users': [another_user.id, another_user1.id]
         }
         logger.debug(f"core.TestVirtualClockController.test_update_allowed_users_full_update(): payload {payload}")
-        self.controller.update_allowed_users(payload)
-        self.clock.refresh_from_db()
-        allowed_users = self.clock.allowed_users.values_list("id", flat=True)
+        await self.controller.update_allowed_users_async(payload)
+        await self.clock.arefresh_from_db()
+        allowed_users = [user_id async for user_id in self.clock.allowed_users.values_list("id", flat=True)]
         logger.debug(
             f"core.TestVirtualClockController.test_update_allowed_users_full_update(): self.clock.allowed_users: " +
             f"{allowed_users}")
         self.assertQuerySetEqual(allowed_users, {2,3}, ordered=False)
 
-    def test_update_allowed_users_add(self):
-        another_user = User.objects.create_user(username='another', password='VeryStrongPass!@#')
-        another_user1 = User.objects.create_user(username='another1', password='iIfDYIGPBikpui%^')
+    async def test_update_allowed_users_add(self):
+        another_user = await User.objects.acreate(username='another', password='VeryStrongPass!@#')
+        another_user1 = await User.objects.acreate(username='another1', password='iIfDYIGPBikpui%^')
         payload = {
             'add_users': [another_user.id, another_user1.id]
         }
-        self.controller.update_allowed_users(payload)
-        self.clock.refresh_from_db()
-        add_users = self.clock.allowed_users.values_list("id", flat=True)
+        await self.controller.update_allowed_users_async(payload)
+        await self.clock.arefresh_from_db()
+        add_users = [user_id async for user_id in self.clock.allowed_users.values_list("id", flat=True)]
         logger.debug(
             f"core.TestVirtualClockController.test_update_allowed_users_add(): self.clock.allowed_users: " +
             f"{add_users}")
         self.assertQuerySetEqual(add_users, {2, 3}, ordered=False)
 
-    def test_update_allowed_users_remove(self):
-        another_user = User.objects.create_user(username='another', password='VeryStrongPass!@#')
-        another_user1 = User.objects.create_user(username='another1', password='iIfDYIGPBikpui%^')
-        users = TimeShiftUser.objects.filter(id__in=[another_user.id, another_user1.id])
-        self.clock.allowed_users.set(users)
-        allowed_users = self.clock.allowed_users.values_list("id", flat=True)
+    async def test_update_allowed_users_remove(self):
+        another_user = await User.objects.acreate(username='another', password='VeryStrongPass!@#')
+        another_user1 = await User.objects.acreate(username='another1', password='iIfDYIGPBikpui%^')
+        test_set = [another_user.id, another_user1.id]
+        users = TimeShiftUser.objects.filter(id__in=test_set)
+        await self.clock.allowed_users.aset(users)
+        allowed_users = [user_id async for user_id in self.clock.allowed_users.values_list("id", flat=True)]
         logger.debug(
             f"core.TestVirtualClockController.test_update_allowed_users_add(): self.clock.allowed_users: " +
             f"{allowed_users}")
+        self.assertQuerySetEqual(allowed_users, test_set)
         payload = {
             'remove_users': [another_user.id, another_user1.id]
         }
-        self.controller.update_allowed_users(payload)
+        await self.controller.update_allowed_users_async(payload)
+        # await self.clock.arefresh_from_db()
+        allowed_users = [user_id async for user_id in self.clock.allowed_users.values_list("id", flat=True)]
         logger.debug(
             f"core.TestVirtualClockController.test_update_allowed_users_add(): self.clock.allowed_users: " +
             f"{allowed_users}")
