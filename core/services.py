@@ -2,11 +2,11 @@ from datetime import timezone, timedelta, datetime
 from logging import getLogger
 from typing import Any, Type
 from zoneinfo import ZoneInfo
-from asgiref.sync import sync_to_async
 
+from asgiref.sync import sync_to_async
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError
+from django.db import transaction
 from django.db.models import QuerySet
 from django.utils import timezone
 from ninja.errors import HttpError
@@ -433,35 +433,40 @@ class VirtualClockController:
 
     @staticmethod
     async def create_clock_async(user, name: str | None = None) -> VirtualClock:
+        return await sync_to_async(VirtualClockController._create_clock_async)(user, name)
+
+    @staticmethod
+    def _create_clock_async(user, name: str | None = None) -> VirtualClock:
         """
         Async-safe creation of a VirtualClock with:
         - max_clocks_count check
         - owner not in allowed_users
         - safe id generation
         """
-        # 1️⃣ Перевіряємо, скільки годинників у користувача
-        current_count = await user.virtual_clocks.acount()
-        max_count = getattr(user, "max_clocks_count", 1)
+        with transaction.atomic():
+            # 1️⃣ Перевіряємо, скільки годинників у користувача
+            current_count = user.virtual_clocks.count()
+            max_count = getattr(user, "max_clocks_count", 1)
 
-        if current_count >= max_count:
-            raise IntegrityError("User has reached the maximum number of clocks.")
+            if current_count >= max_count:
+                raise ValidationError("User has reached the maximum number of clocks.")
 
-        # 2️⃣ Генеруємо новий id без блокувань
-        last_clock = await VirtualClock.objects.order_by("-id").afirst()
-        new_id = 1 if not last_clock else last_clock.id + 1
+            # 2️⃣ Генеруємо новий id без блокувань
+            last_clock = VirtualClock.objects.order_by("-id").first()
+            new_id = 1 if not last_clock else last_clock.id + 1
 
-        # 3️⃣ Створюємо новий годинник асинхронно
-        clock = await VirtualClock.objects.acreate(
-            id=new_id,
-            user_owner=user,
-            name=name
-        )
+            # 3️⃣ Створюємо новий годинник асинхронно
+            clock = VirtualClock.objects.create(
+                id=new_id,
+                user_owner=user,
+                name=name
+            )
 
-        # 4️⃣ Додатковий чек: власник не повинен бути в allowed_users
-        owner_in_allowed = await clock.allowed_users.filter(pk=user.pk).aexists()
-        if owner_in_allowed:
-            # Виправляємо стан, видаляючи власника з allowed_users
-            await sync_to_async(clock.allowed_users.remove)(user)
-            raise IntegrityError("Owner cannot be in allowed_users.")
+            # 4️⃣ Додатковий чек: власник не повинен бути в allowed_users
+            owner_in_allowed = clock.allowed_users.filter(pk=user.pk).exists()
+            if owner_in_allowed:
+                # Виправляємо стан, видаляючи власника з allowed_users
+                clock.allowed_users.remove(user)
+                raise ValidationError("Owner cannot be in allowed_users.")
 
         return clock

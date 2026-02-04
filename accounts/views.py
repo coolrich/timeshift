@@ -10,7 +10,6 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth import login
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError
 from django.db.models import Q
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -20,9 +19,9 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views import View
 from django.views.generic import CreateView, TemplateView, ListView, UpdateView, DetailView, DeleteView
 
+from accounts.utils.context import clocks_list_context
 from core.models import VirtualClock
 from core.services import VirtualClockController
-from accounts.utils.context import clocks_list_context
 from .exceptions import TokenRefreshTooOften
 from .forms import TimeShiftUserCreationForm, UserSettingsForm
 from .services import UserController
@@ -160,8 +159,8 @@ class ClockCreateView(LoginRequiredMixin, CreateView):
         logger.debug(f"Creating clock for user {self.request.user} with name {form.cleaned_data['name']}")
         try:
             return super().form_valid(form)
-        except IntegrityError as e:
-            logger.info(f"ClockCreateView.form_valid(): IntegrityError: {e}")
+        except ValidationError as e:
+            logger.info(f"ClockCreateView.form_valid(): ValidationError: {e}")
             messages.warning(self.request, "Не вдалося створити годинник. Перевищено ліміт годинників.")
             return redirect("profile_clocks")
 

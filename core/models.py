@@ -3,8 +3,9 @@ import logging
 import warnings
 
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, MaxValueValidator
-from django.db import models, IntegrityError
+from django.db import models, transaction
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
@@ -50,27 +51,28 @@ class VirtualClock(models.Model):
 
     def save(self, *args, **kwargs):
         if self.pk and self.allowed_users.filter(pk=self.user_owner.pk).exists():
-            raise IntegrityError("Owner cannot be in allowed_users.")
+            raise ValidationError("Owner cannot be in allowed_users.")
 
         if not self.pk and self.user_owner.virtual_clocks.count() >= self.user_owner.max_clocks_count:
             for clock in self.user_owner.virtual_clocks.order_by("-created_at").all():
                 if self.user_owner.virtual_clocks.count() <= self.user_owner.max_clocks_count:
                     break
                 clock.delete()
-            raise IntegrityError("User has reached the maximum number of clocks.")
+            raise ValidationError("User has reached the maximum number of clocks.")
 
-        last = VirtualClock.objects.all().order_by("-id").first()
-        logger.debug(f"core.models.VirtualClock.save(): last: {last}")
-        if not last:
-            logger.debug(f"core.models.VirtualClock.save(): created first clock")
-            self.id = 1
-        else:
-            logger.debug(f"core.models.VirtualClock.save(): self.id is {self.id}")
-            if not self.id:
-                logger.debug(f"core.models.VirtualClock.save(): initiated id: {int(last.id) + 1}")
-                self.id = int(last.id) + 1
-        logger.debug(f"core.models.VirtualClock.save(): self.id is {self.id} | name: {self.name} | tick_enabled: {self.tick_enabled}")
-        super().save(*args, **kwargs)
+        with transaction.atomic():
+            last = VirtualClock.objects.all().order_by("-id").first()
+            logger.debug(f"core.models.VirtualClock.save(): last: {last}")
+            if not last:
+                logger.debug(f"core.models.VirtualClock.save(): created first clock")
+                self.id = 1
+            else:
+                logger.debug(f"core.models.VirtualClock.save(): self.id is {self.id}")
+                if not self.id:
+                    logger.debug(f"core.models.VirtualClock.save(): initiated id: {int(last.id) + 1}")
+                    self.id = int(last.id) + 1
+            logger.debug(f"core.models.VirtualClock.save(): self.id is {self.id} | name: {self.name} | tick_enabled: {self.tick_enabled}")
+            super().save(*args, **kwargs)
 
 
 

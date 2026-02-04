@@ -1,7 +1,6 @@
 import logging
 
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db import IntegrityError
 from django.http import Http404
 
 from core.models import VirtualClock
@@ -15,7 +14,7 @@ EXCEPTION_CODES = {
     VirtualClock.DoesNotExist: 404,
     ValueError: 404,
     ValidationError: 404,
-    IntegrityError: 409,
+   # IntegrityError: 409,
 }
 
 
