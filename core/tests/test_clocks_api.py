@@ -9,6 +9,7 @@ from ninja import NinjaAPI
 from ninja.testing import TestAsyncClient
 
 from core.auth import SessionOrToken
+from core.exception_handlers import create_exception_handler
 from core.models import VirtualClock
 from django_project.api import create_clock_router
 
@@ -26,6 +27,7 @@ class TestClockAsyncAPI:
         api = NinjaAPI(auth=SessionOrToken(), version="test")
         request.cls.router = create_clock_router()
         api.add_router("/clocks/", router=request.cls.router)
+        api.exception_handler = create_exception_handler(api)
 
         request.cls.api = api
         request.cls.client = TestAsyncClient(api)
@@ -37,7 +39,7 @@ class TestClockAsyncAPI:
             password="emilypass",
             email="emily@example.com",
             phone_number="+380969817231",
-            max_clocks_count=10
+            max_clocks_count=8
         )
 
         self.stranger_user = await User.objects.acreate_user(
@@ -71,6 +73,9 @@ class TestClockAsyncAPI:
         self.auth_headers = {
             "Authorization": f"Bearer {self.user.api_token}"
         }
+        self.stranger_auth_headers = {
+            "Authorization": f"Bearer {self.stranger_user.api_token}"
+        }
         # await self.clock1.allowed_users.aadd(self.stranger_user.id)
         # logger.debug(f"core.TestClockAsyncAPI.setup():"
         #              f"clock1.allowed_users: {self.clock1.allowed_users}")
@@ -84,7 +89,7 @@ class TestClockAsyncAPI:
             headers=self.auth_headers
         )
         payload = response.json()
-        expected = {'status','data', 'message'}
+        expected = {'status', 'data', 'message'}
         assert expected == set(payload), f"Expected keys {expected}, got {set(payload)}"
         assert response.status_code == 200
         await self.clock1.arefresh_from_db()
@@ -263,3 +268,54 @@ class TestClockAsyncAPI:
 
         assert response.status_code == 404
         assert await VirtualClock.objects.filter(id=clock.id).aexists()
+
+    @pytest.mark.django_db(transaction=True)  # transaction=True важливо для select_for_update
+    async def test_clocks_race_condition(self):
+        USERS_COUNT = 30
+        REQUESTS_COUNT = USERS_COUNT
+        start = asyncio.Event()
+        another_users = [await User.objects.acreate_user(
+            username=f"user{i}",
+            password="userpass123",
+            max_clocks_count=REQUESTS_COUNT) for i in range(USERS_COUNT)]
+
+        async def create_clock(user: User):
+            await start.wait()
+            await asyncio.sleep(0.01)
+            return await self.client.post(
+                path='/clocks/',
+                headers={
+                    "Authorization": f"Bearer {user.api_token}"
+                }
+            )
+
+        # tasks = [asyncio.create_task(create_clock()) for _ in range(REQUESTS_COUNT)]
+        tasks = []
+        for user in another_users:
+            for _ in range(REQUESTS_COUNT):
+                tasks.append(asyncio.create_task(create_clock(user)))
+        start.set()
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        for r in results:
+            if isinstance(r, Exception):
+                raise r
+
+        for result in results:
+            if hasattr(result, "status_code"):
+                logger.debug(f"Result: {result.status_code}")
+            else:
+                logger.error(f"Unexpected result: {result!r}")
+
+        # --- Перевірка ---
+        # clocks = VirtualClock.objects.filter(user_owner=self.stranger_user)
+        for user in another_users:
+            count = await VirtualClock.objects.filter(user_owner=user).acount()
+            assert count == user.max_clocks_count, \
+                f"Ліміт порушено для {user.username}: {count}"
+
+        # Всі відповіді після досягнення ліміту повинні бути помилкою
+        success_responses = [r for r in results if getattr(r, "status_code", None) == 201]
+        error_responses = [r for r in results if getattr(r, "status_code", None) == 429]
+
+        assert len(success_responses) == len(another_users) * another_users[0].max_clocks_count, "Невірна кількість створених годинників"
+        assert len(error_responses) == len(tasks) - len(another_users) * another_users[0].max_clocks_count, "Невірна кількість помилок"

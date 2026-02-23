@@ -5,6 +5,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.base_user import AbstractBaseUser
 from ninja.errors import HttpError
 from ninja.security.base import AuthBase
+from core.services import AuthHelper
 
 logger = logging.getLogger(__name__)
 
@@ -28,16 +29,17 @@ class SessionOrToken(AuthBase):
             return request.user
 
         # 2) Bearer токен
-        logger.info(f"Attempting to authenticate user from token: {request.headers.get('Authorization', None)}")
+        token = request.headers.get('Authorization', None)
+        logger.info(f"Attempting to authenticate user from token: {AuthHelper.mask_token(token)}")
         auth = request.headers.get("Authorization", "")
         if auth.lower().startswith("bearer "):
             token = auth[7:].strip()
             try:
                 user: User = User.objects.get(_api_token=token)
             except User.DoesNotExist:
-                logger.info(f"User not found for token: {token}")
+                logger.info(f"User not found for token: {AuthHelper.mask_token(token)}")
                 raise HttpError(401, f"Invalid authentication token")
-            logger.info(f"Authenticated user {user.username} from token: {token}")
+            logger.info(f"Authenticated user {user.username} from token: {AuthHelper.mask_token(token)}")
             logger.info(f"Action: {request.method} {request.path}")
             return user
 

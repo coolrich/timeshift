@@ -10,6 +10,8 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 import os
+import sys
+from logging import DEBUG
 from pathlib import Path
 
 import dj_database_url
@@ -26,6 +28,17 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv("SECRET_KEY")
+
+if not SECRET_KEY:
+    print("ERROR: SECRET_KEY environment variable is not set!")
+    print("Generate one with:")
+    print("python -c 'from django.core.management.utils import get_random_secret_key;print(get_random_secret_key())'")
+    sys.exit(1)
+
+if len(SECRET_KEY)<50:
+    print("WARNING: SECRET_KEY is too short(should be 50+ characters)")
+    if not DEBUG:
+        sys.exit(1)
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv("DEBUG", "False") == "True"

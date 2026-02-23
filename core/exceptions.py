@@ -1,0 +1,2 @@
+class ClockLimitExceededError(Exception):
+    pass

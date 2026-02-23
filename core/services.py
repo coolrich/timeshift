@@ -1,3 +1,4 @@
+import asyncio
 from datetime import timezone, timedelta, datetime
 from logging import getLogger
 from typing import Any, Type
@@ -6,11 +7,13 @@ from zoneinfo import ZoneInfo
 from asgiref.sync import sync_to_async
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+
 from django.db import transaction
 from django.db.models import QuerySet
 from django.utils import timezone
 from ninja.errors import HttpError
 
+from .exceptions import ClockLimitExceededError
 from .models import VirtualClock
 
 User = get_user_model()
@@ -201,7 +204,8 @@ class VirtualClockController:
             self.save()
         return self
 
-    async def set_real_time_async(self, tick_enabled: bool = False, save: bool = True) -> Type['VirtualClockController']:
+    async def set_real_time_async(self, tick_enabled: bool = False, save: bool = True) -> Type[
+        'VirtualClockController']:
         """
         Set the virtual clock to the current real time and stop the tick.
 
@@ -433,40 +437,44 @@ class VirtualClockController:
 
     @staticmethod
     async def create_clock_async(user, name: str | None = None) -> VirtualClock:
-        return await sync_to_async(VirtualClockController._create_clock_async)(user, name)
+
+        return await sync_to_async(
+            VirtualClockController.create_clock,
+            thread_sensitive=True
+        )(user, name)
 
     @staticmethod
-    def _create_clock_async(user, name: str | None = None) -> VirtualClock:
-        """
-        Async-safe creation of a VirtualClock with:
-        - max_clocks_count check
-        - owner not in allowed_users
-        - safe id generation
-        """
+    def create_clock(user, name=None):
         with transaction.atomic():
-            # 1️⃣ Перевіряємо, скільки годинників у користувача
-            current_count = user.virtual_clocks.count()
-            max_count = getattr(user, "max_clocks_count", 1)
+            # Використовуємо select_for_update з блокуванням рядка
+            user = type(user).objects.select_for_update().get(pk=user.pk)
 
-            if current_count >= max_count:
-                raise ValidationError("User has reached the maximum number of clocks.")
+            # Атомарна перевірка та створення
+            if user.virtual_clocks.count() >= user.max_clocks_count:
+                raise ClockLimitExceededError
 
-            # 2️⃣ Генеруємо новий id без блокувань
-            last_clock = VirtualClock.objects.order_by("-id").first()
-            new_id = 1 if not last_clock else last_clock.id + 1
+            # asyncio.sleep(0.01)
 
-            # 3️⃣ Створюємо новий годинник асинхронно
+            # Створюємо
             clock = VirtualClock.objects.create(
-                id=new_id,
                 user_owner=user,
-                name=name
+                name=name,
             )
 
-            # 4️⃣ Додатковий чек: власник не повинен бути в allowed_users
-            owner_in_allowed = clock.allowed_users.filter(pk=user.pk).exists()
-            if owner_in_allowed:
-                # Виправляємо стан, видаляючи власника з allowed_users
-                clock.allowed_users.remove(user)
-                raise ValidationError("Owner cannot be in allowed_users.")
+            # Валідація після створення (якщо потрібно)
+            clock.full_clean()
+
+            # user.save()
 
         return clock
+
+
+class AuthHelper:
+    @staticmethod
+    def mask_token(token: str) -> str:
+        """
+        Mask token for logging (show first 8 and last 4 chars)
+        """
+        if len(token) <= 12:
+            return "***"
+        return f"{token[:8]}...{token[-4:]}"
