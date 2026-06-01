@@ -1,7 +1,6 @@
 from logging import getLogger
 
 from django.contrib.auth import get_user_model
-from django.core.exceptions import ValidationError
 from django.test import TestCase
 
 from core.exceptions import ClockLimitExceededError
@@ -27,7 +26,7 @@ class ClockTests(TestCase):
         logger.debug(f"ClockTests.test_users_clock_limit(): len(self.user.virtual_clocks): {self.user.virtual_clocks.count()}")
         self.assertEqual(self.user.virtual_clocks.count(), 1)
 
-    async def test_speed_min_max_vals(self):
+    def test_speed_min_max_vals(self):
         validators = self.clock._meta.get_field("speed").validators
         assert validators[0].limit_value == 0.01
         assert validators[1].limit_value == 100.0

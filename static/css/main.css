@@ -57,9 +57,9 @@ body {
 }
 
 .my-bg-gradient {
-    --bs-gradient-from: var(black);
-    --bs-gradient-to: var(gray);
-    background: linear-gradient(to top, var(--bs-gradient-from), var(--bs-gradient-to) !important;
+    --bs-gradient-from: black;
+    --bs-gradient-to: gray;
+    background: linear-gradient(to top, var(--bs-gradient-from), var(--bs-gradient-to)) !important;
 }
 
 /*.alert-msg {

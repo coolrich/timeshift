@@ -19,12 +19,14 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views import View
 from django.views.generic import CreateView, TemplateView, ListView, UpdateView, DetailView, DeleteView
 
+from accounts.mixins import PostRateLimitMixin
 from accounts.utils.context import clocks_list_context
 from core.models import VirtualClock
 from core.services import VirtualClockController
+from .models import ThrottleRule
 from .exceptions import TokenRefreshTooOften
 from .forms import TimeShiftUserCreationForm, UserSettingsForm
-from .services import UserController
+from accounts.services.user import UserController
 
 # locale.setlocale(locale.LC_TIME, "uk-UA.UTF-8")
 
@@ -32,10 +34,11 @@ logger = getLogger(__name__)
 User = get_user_model()
 
 
-class SignUpView(CreateView):
+class SignUpView(PostRateLimitMixin, CreateView):
     form_class = TimeShiftUserCreationForm
     success_url = reverse_lazy("profile_dashboard")
     template_name = "registration/signup.html"
+    throttle_scope = ThrottleRule.Scope.GLOBAL
 
     def form_valid(self, form):
         response = super().form_valid(form)
@@ -81,10 +84,13 @@ class ProfileClocksView(LoginRequiredMixin, ListView):
     context_object_name = "clocks"
 
     def get_queryset(self):
-        return VirtualClock.objects.filter(
+        return (VirtualClock.objects.filter(
             Q(user_owner=self.request.user) |
             Q(allowed_users=self.request.user)
-        ).distinct()
+        ).select_related('user_owner')
+         .prefetch_related('allowed_users')
+         .distinct()
+        )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -147,11 +153,12 @@ class ClockDetailView(LoginRequiredMixin, DetailView):
         return context
 
 
-class ClockCreateView(LoginRequiredMixin, CreateView):
+class ClockCreateView(LoginRequiredMixin, PostRateLimitMixin, CreateView):
     model = VirtualClock
     fields = ["name"]
     template_name = "accounts/clock_create.html"
     success_url = reverse_lazy("profile_clocks")
+    throttle_scope = ThrottleRule.Scope.CLOCKS_CREATE
 
     def form_valid(self, form):
         # додаємо власника
@@ -165,10 +172,11 @@ class ClockCreateView(LoginRequiredMixin, CreateView):
             return redirect("profile_clocks")
 
 
-class ClockDeleteView(LoginRequiredMixin, DeleteView):
+class ClockDeleteView(LoginRequiredMixin, PostRateLimitMixin, DeleteView):
     model = VirtualClock
     template_name = "accounts/clock_confirm_delete.html"
     success_url = reverse_lazy("profile_clocks")
+    throttle_scope = ThrottleRule.Scope.GLOBAL
 
     def get_queryset(self):
         # дозволяємо видаляти лише свої годинники
@@ -176,11 +184,12 @@ class ClockDeleteView(LoginRequiredMixin, DeleteView):
 
 
 # ⚙️ 4. Налаштування користувача
-class ProfileSettingsView(LoginRequiredMixin, UpdateView):
+class ProfileSettingsView(LoginRequiredMixin, PostRateLimitMixin, UpdateView):
     model = User
     form_class = UserSettingsForm
     template_name = "accounts/settings.html"
     success_url = reverse_lazy("profile_settings")
+    throttle_scope = ThrottleRule.Scope.GLOBAL
 
     def get_object(self):
         return self.request.user
@@ -191,7 +200,9 @@ class ProfileSettingsView(LoginRequiredMixin, UpdateView):
         return response
 
 
-class UserTokenUpdateView(LoginRequiredMixin, View):
+class UserTokenUpdateView(LoginRequiredMixin, PostRateLimitMixin, View):
+    throttle_scope = ThrottleRule.Scope.GLOBAL
+
     def post(self, request, *args, **kwargs):
         logger.debug(f"UserTokenUpdateView(): post(): old token\n{request.user.api_token}")
         try:
@@ -213,7 +224,9 @@ class UserTokenUpdateView(LoginRequiredMixin, View):
             return redirect(reverse('home'))
 
 
-class ClockControlView(LoginRequiredMixin, View):
+class ClockControlView(LoginRequiredMixin, PostRateLimitMixin, View):
+    throttle_scope = ThrottleRule.Scope.GLOBAL
+
     def get_queryset(self):
         return VirtualClock.objects.filter(
             Q(user_owner=self.request.user) |

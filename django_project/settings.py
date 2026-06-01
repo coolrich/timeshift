@@ -59,14 +59,17 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'webapp.apps.PagesConfig',
-    'accounts',
+    # 'accounts',
+    'accounts.apps.AccountsConfig',
     'core',
     'phonenumber_field',
     'ninja',
+    'corsheaders'
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -187,4 +190,38 @@ LOGGING = {
         "level": "DEBUG",
     },
 }
+
 APPEND_SLASH=True
+
+if DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = True
+else:
+    CORS_ALLOWED_ORIGINS=[
+        'https://timeshift-32oc.onrender.com',
+        'https://www.timeshift-32oc.onrender.com'
+    ]
+
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_HEADERS=[
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+
+NINJA_THROTTLE_RATES = {
+    "global": "60/m",
+    "clock_create": "5/m",
+}
+
+if DEBUG:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        }
+    }

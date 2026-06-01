@@ -3,7 +3,7 @@ import logging
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.http import Http404
 
-from accounts.exceptions import TokenRefreshTooOften
+from accounts.exceptions import LimitExceeded, TokenRefreshTooOften
 from django_project.api import api
 
 logger = logging.getLogger(__name__)
@@ -27,6 +27,23 @@ def token_refresh_too_often_handler(request, exc):
         headers={
             "Retry-After": str(exc.retry_after)
         }
+    )
+
+
+@api.exception_handler(LimitExceeded)
+def rate_limit_handler(request, exc):
+    headers = {}
+    if exc.retry_after is not None:
+        headers["Retry-After"] = str(exc.retry_after)
+    return api.create_response(
+        request,
+        {
+            "detail": str(exc),
+            "retry_after": exc.retry_after,
+            "scope": exc.scope,
+        },
+        status=429,
+        headers=headers,
     )
 
 @api.exception_handler(Exception)

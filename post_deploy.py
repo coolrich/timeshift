@@ -4,6 +4,9 @@ import django
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 
+from accounts.models import Plan
+from logging import getLogger
+logger = getLogger(__name__)
 
 def run():
     print("Post-deploy script started")
@@ -26,6 +29,9 @@ def run():
                 password=os.environ.get('PASSWORD', 'adminpassword')
             )
         print("Superuser created.")
+        Plan.objects.update_or_create(code=Plan.Code.FREE, name="Free", description="Free plan", is_active=True)
+
+
     # call_command('collectstatic', '--noinput')
     print("Post-deploy script finished")
 

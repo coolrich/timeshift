@@ -2,9 +2,11 @@ from ninja import NinjaAPI
 
 from accounts.api.api import create_user_router
 from core.api.api import create_clock_router
+from core.api.throttles import GlobalUserThrottle
 from core.auth import SessionOrToken
 
 api = NinjaAPI(auth=SessionOrToken(),
+               throttle=GlobalUserThrottle(),
                title="TimeShift API",
                description="TimeShift API",
                version="1.0.0")

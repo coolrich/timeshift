@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from ninja import Router
 
 from accounts.schemas import UserDataUpdate, ErrorUserResponse, UserUpdateRequest
-from accounts.services import UserController
+from accounts.services.user import UserController
 
 logger = getLogger(__name__)
 User = get_user_model()

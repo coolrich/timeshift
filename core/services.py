@@ -1,4 +1,3 @@
-import asyncio
 from datetime import timezone, timedelta, datetime
 from logging import getLogger
 from typing import Any, Type
@@ -7,7 +6,6 @@ from zoneinfo import ZoneInfo
 from asgiref.sync import sync_to_async
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-
 from django.db import transaction
 from django.db.models import QuerySet
 from django.utils import timezone
@@ -463,6 +461,8 @@ class VirtualClockController:
 
             # Валідація після створення (якщо потрібно)
             clock.full_clean()
+            logger.debug(f"core.services.VirtualClockController.create_clock(): created clock {clock.id} "
+                         f"for user {user.username}({user.id})")
 
             # user.save()
 
@@ -478,3 +478,4 @@ class AuthHelper:
         if len(token) <= 12:
             return "***"
         return f"{token[:8]}...{token[-4:]}"
+

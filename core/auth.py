@@ -5,6 +5,8 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.base_user import AbstractBaseUser
 from ninja.errors import HttpError
 from ninja.security.base import AuthBase
+
+from accounts.services.throttle_helper import build_user_rates
 from core.services import AuthHelper
 
 logger = logging.getLogger(__name__)
@@ -13,35 +15,48 @@ User = get_user_model()
 
 
 class SessionOrToken(AuthBase):
-    openapi_type = "http"         # ← ОБОВʼЯЗКОВО
-    openapi_scheme = "bearer"     # ← каже OpenAPI що це Bearer Auth
+    openapi_type = "http"
+    openapi_scheme = "bearer"
 
     def __call__(self, request):
         return self.authenticate(request)
 
-    def authenticate(self, request) -> AbstractBaseUser | None | Any:
-        # 1) Якщо юзер є в сесії (через django.contrib.auth)
-        logger.info("==============================================")
-        logger.info(f"Attempting to authenticate user from session: {getattr(request, 'user', None)}")
-        if getattr(request, "user", None) and request.user.is_authenticated:
-            logger.info(f"Authenticated user from session: {request.user}")
-            logger.info(f"Action: {request.method} {request.path}")
-            return request.user
+    @staticmethod
+    def _attach_rates_cache(user: User) -> User:
+        logger.debug(f"core.auth.SessionOrToken._attach_rates_cache():")
+        user.rates_cache = build_user_rates(user)
+        return user
 
-        # 2) Bearer токен
-        token = request.headers.get('Authorization', None)
-        logger.info(f"Attempting to authenticate user from token: {AuthHelper.mask_token(token)}")
+    def authenticate(self, request) -> AbstractBaseUser | None | Any:
+        logger.info("==============================================")
+        logger.debug(f"core.auth.SessionOrToken.authenticate():")
+        # 1) Session auth
+        if getattr(request, "user", None) and request.user.is_authenticated:
+            logger.debug(f"Authenticated user from session: {request.user}")
+            logger.debug(f"Action: {request.method} {request.path}")
+
+            return self._attach_rates_cache(request.user)
+
+        # 2) Token auth
         auth = request.headers.get("Authorization", "")
+
+        logger.debug(f"Attempting to authenticate user from token: {AuthHelper.mask_token(auth)}")
+
         if auth.lower().startswith("bearer "):
             token = auth[7:].strip()
+
             try:
-                user: User = User.objects.get(_api_token=token)
+                user = (
+                    User.objects
+                    .get(_api_token=token)
+                )
             except User.DoesNotExist:
-                logger.info(f"User not found for token: {AuthHelper.mask_token(token)}")
-                raise HttpError(401, f"Invalid authentication token")
-            logger.info(f"Authenticated user {user.username} from token: {AuthHelper.mask_token(token)}")
-            logger.info(f"Action: {request.method} {request.path}")
-            return user
+                logger.debug(f"User not found for token: {AuthHelper.mask_token(token)}")
+                raise HttpError(401, "Invalid authentication token")
+
+            logger.debug(f"Authenticated user {user.username} from token: {AuthHelper.mask_token(token)}")
+            logger.debug(f"Action: {request.method} {request.path}")
+
+            return self._attach_rates_cache(user)
 
         return None
-

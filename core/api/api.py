@@ -5,9 +5,10 @@ from asgiref.sync import sync_to_async
 from django.contrib.auth import get_user_model
 from django.http import HttpResponse
 from ninja import Router, Body
-from ninja.responses import Response
 from ninja.errors import HttpError
+from ninja.responses import Response
 
+from core.api.throttles import ClocksCreateThrottle
 from core.schemas import (
     TimeData, VirtualClockInfo, ClockUpdateRequest,
     CreateClockRequest, TimeDataUpdate, ErrorClockResponse,
@@ -15,7 +16,6 @@ from core.schemas import (
 )
 from core.services import VirtualClockController
 from core.utils import TimeService
-from core.models import VirtualClock
 from django_project import settings
 
 logger = getLogger(__name__)
@@ -54,15 +54,19 @@ async def get_v_clock_controller(
 def create_clock_router() -> Router:
     """
     Factory function to create a new Router instance with all clock endpoints.
-    Useful for tests or multiple API instances.
+    Useful for accounts or multiple API instances.
     """
     router = Router()
     if settings.DEBUG:
-        @router.get("/test", response={200: dict})
+        @router.get("/test",
+                    # throttle=GlobalUserThrottle(),
+                    response={200: dict})
         async def test_route(request):
             return {"message": "Hello from test route!"}
 
-    @router.post("/setreal", response={200: Union[TimeResponse | BaseClockSchema], 403: ErrorClockResponse})
+    @router.post("/setreal",
+                 # throttle=GlobalUserThrottle(),
+                 response={200: Union[TimeResponse | BaseClockSchema], 403: ErrorClockResponse})
     async def set_real(request, payload: BaseClockRequest):
         clock_id = payload.clock_id
         controller, user = await get_v_clock_controller(request, clock_id)
@@ -97,7 +101,9 @@ def create_clock_router() -> Router:
                 "message": "Time set to real time"
             }
 
-    @router.post("", response={201: VirtualClockInfo, 403: ErrorClockResponse})
+    @router.post("",
+                 response={201: VirtualClockInfo, 403: ErrorClockResponse},
+                 throttle=ClocksCreateThrottle())
     async def create_clock(request, payload: Optional[CreateClockRequest] = None):
         user = request.auth
         clock = await VirtualClockController.create_clock_async(
@@ -113,22 +119,38 @@ def create_clock_router() -> Router:
             status=201
         )
 
-    @router.get("/{clock_id}", response={200: TimeData, 403: ErrorClockResponse}, url_name='api-retrieve-clock')
+    @router.get("/{clock_id}",
+                # throttle=GlobalUserThrottle(),
+                response={200: TimeData, 403: ErrorClockResponse}, url_name='api-retrieve-clock')
     async def retrieve_clock(request, clock_id: int):
         controller, user = await get_v_clock_controller(request, clock_id)
         allowed_users = [user_id async for user_id in controller.virtual_clock.allowed_users.
         values_list("id", flat=True)]
-        return TimeData(
-            clock_id=controller.virtual_clock.id,
-            user_owner_id=controller.get_user_owner().id,
-            name=controller.virtual_clock.name,
-            time=controller.get_iso_time(),
-            speed=controller.get_clock_speed(),
-            allowed_users=allowed_users,
-            tick_enabled=controller.tick_status
-        )
+        # clock = controller.virtual_clock
+        owner = await sync_to_async(controller.get_user_owner)()
+        if owner == user:
+            return TimeData(
+                clock_id=controller.virtual_clock.id,
+                user_owner_id=controller.get_user_owner().id,
+                name=controller.virtual_clock.name,
+                time=controller.get_iso_time(),
+                speed=controller.get_clock_speed(),
+                allowed_users=allowed_users,
+                tick_enabled=controller.tick_status
+            )
+        else:
+            return TimeData(
+                clock_id=controller.virtual_clock.id,
+                user_owner_id=controller.get_user_owner().id,
+                name=controller.virtual_clock.name,
+                time=controller.get_iso_time(),
+                speed=controller.get_clock_speed(),
+                tick_enabled=controller.tick_status
+            )
 
-    @router.get("", response={200: List[TimeData], 403: ErrorClockResponse}, url_name='api-list-clocks')
+    @router.get("",
+                # throttle=GlobalUserThrottle(),
+                response={200: List[TimeData], 403: ErrorClockResponse}, url_name='api-list-clocks')
     async def list_clocks(request):
         logger.info(f"core.api.api.list_clocks(): begin")
         user = request.auth
@@ -161,7 +183,9 @@ def create_clock_router() -> Router:
                 ))
         return clocks
 
-    @router.put("", response={200: TimeDataUpdate, 403: ErrorClockResponse}, url_name='api-update-clock')
+    @router.put("",
+                # throttle=GlobalUserThrottle(),
+                response={200: TimeDataUpdate, 403: ErrorClockResponse}, url_name='api-update-clock')
     async def update_clock(request, payload: ClockUpdateRequest = Body(...)):
         logger.debug(f"core.api.api.update_clock: {payload}")
         payload_dict = payload.dict()
@@ -217,6 +241,7 @@ def create_clock_router() -> Router:
 
     @router.delete(
         "/{clock_id}",
+        # throttle=GlobalUserThrottle(),
         response={204: None, 404: ErrorClockResponse, 403: ErrorClockResponse},
     )
     async def delete_clock(request, clock_id: int):

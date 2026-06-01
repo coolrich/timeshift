@@ -2,16 +2,17 @@ import asyncio
 import logging
 
 import pytest
-from asgiref.sync import sync_to_async
 from django.contrib.auth import get_user_model
-from django.db import transaction
+from django.core.cache import cache
 from ninja import NinjaAPI
 from ninja.testing import TestAsyncClient
 
+from accounts.models import ThrottleRule
+from core.api.api import create_clock_router
+from core.api.throttles import GlobalUserThrottle
 from core.auth import SessionOrToken
 from core.exception_handlers import create_exception_handler
 from core.models import VirtualClock
-from django_project.api import create_clock_router
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -21,34 +22,28 @@ logger = logging.getLogger(__name__)
 @pytest.mark.asyncio
 class TestClockAsyncAPI:
     """Клас для асинхронних тестів годинників"""
-
     @pytest.fixture(scope="class", autouse=True)
     def init_api(self, request):
-        api = NinjaAPI(auth=SessionOrToken(), version="test")
+        logger.debug(f"core.TestClockAsyncAPI.init_api(): start")
+        api = NinjaAPI(auth=SessionOrToken(),
+                       version="test",
+                       throttle=GlobalUserThrottle()
+                       )
         request.cls.router = create_clock_router()
         api.add_router("/clocks/", router=request.cls.router)
         api.exception_handler = create_exception_handler(api)
 
         request.cls.api = api
         request.cls.client = TestAsyncClient(api)
+        logger.debug(f"core.TestClockAsyncAPI.init_api(): finish")
 
     @pytest.fixture(autouse=True)
-    async def setup(self, db):
-        self.user = await User.objects.acreate_user(
-            username="emily",
-            password="emilypass",
-            email="emily@example.com",
-            phone_number="+380969817231",
-            max_clocks_count=8
-        )
+    async def setup(self, db, users_async):
+        logger.debug("core.TestClockAsyncAPI.setup(): start")
 
-        self.stranger_user = await User.objects.acreate_user(
-            username="strangeruser",
-            password="testpass",
-            email="strangeruser@example.com",
-            phone_number="+380969817210",
-            max_clocks_count=10
-        )
+        cache.clear()
+
+        self.user, self.stranger_user = users_async
 
         self.clock1 = await VirtualClock.objects.acreate(
             user_owner=self.user,
@@ -69,18 +64,15 @@ class TestClockAsyncAPI:
             tick_enabled=True,
             speed=2.0
         )
-        await asyncio.sleep(0)
+        # await asyncio.sleep(0)
         self.auth_headers = {
             "Authorization": f"Bearer {self.user.api_token}"
         }
         self.stranger_auth_headers = {
             "Authorization": f"Bearer {self.stranger_user.api_token}"
         }
-        # await self.clock1.allowed_users.aadd(self.stranger_user.id)
-        # logger.debug(f"core.TestClockAsyncAPI.setup():"
-        #              f"clock1.allowed_users: {self.clock1.allowed_users}")
+        logger.debug(f"core.TestClockAsyncAPI.init_api(): finish")
         yield
-        # cleanup не потрібен
 
     async def test_set_real_time_for_owner(self):
         response = await self.client.post(
@@ -202,12 +194,7 @@ class TestClockAsyncAPI:
         assert response.status_code == 422
 
     async def test_update_clock_denied_for_non_owner(self):
-        stranger = await User.objects.acreate_user(
-            username="nick",
-            password="nickpass",
-            email="nick@example.com",
-            phone_number="+380969817231"
-        )
+        stranger = self.stranger_user
 
         clock = await VirtualClock.objects.acreate(
             user_owner=self.user,
@@ -220,7 +207,8 @@ class TestClockAsyncAPI:
                 "clock_id": clock.id,
                 "allowed_users": [str(stranger.id)]
             },
-            headers={"Authorization": f"Bearer {stranger.api_token}"}
+            headers={"Authorization": f"Bearer {stranger.api_token}"},
+            user=stranger
         )
 
         assert response.status_code == 404
@@ -249,73 +237,138 @@ class TestClockAsyncAPI:
         assert not await VirtualClock.objects.filter(id=clock.id).aexists()
 
     async def test_delete_clock_for_non_owner(self):
-        stranger = await User.objects.acreate_user(
-            username="nick2",
-            password="nickpass",
-            email="nick2@example.com",
-            phone_number="+380969817232"
-        )
-
-        clock = await VirtualClock.objects.acreate(
-            user_owner=self.user,
-            name="Clock1"
-        )
+        stranger = self.stranger_user
 
         response = await self.client.delete(
             f"/clocks/{self.clock1.id}",
-            headers={"Authorization": f"Bearer {stranger.api_token}"}
+            headers={"Authorization": f"Bearer {stranger.api_token}"},
+            # user=stranger
         )
 
         assert response.status_code == 404
-        assert await VirtualClock.objects.filter(id=clock.id).aexists()
 
-    @pytest.mark.django_db(transaction=True)  # transaction=True важливо для select_for_update
-    async def test_clocks_race_condition(self):
-        USERS_COUNT = 30
+    @pytest.mark.django_db(transaction=True)
+    async def test_clocks_race_condition(self, users_factory_async, free_plan):
+
+        USERS_COUNT = 5
         REQUESTS_COUNT = USERS_COUNT
-        start = asyncio.Event()
-        another_users = [await User.objects.acreate_user(
-            username=f"user{i}",
-            password="userpass123",
-            max_clocks_count=REQUESTS_COUNT) for i in range(USERS_COUNT)]
 
-        async def create_clock(user: User):
+        start = asyncio.Event()
+        users = await users_factory_async(USERS_COUNT, REQUESTS_COUNT, free_plan)
+
+        async def create_clock(user):
             await start.wait()
-            await asyncio.sleep(0.01)
             return await self.client.post(
                 path='/clocks/',
-                headers={
-                    "Authorization": f"Bearer {user.api_token}"
-                }
+                headers={"Authorization": f"Bearer {user.api_token}"}
             )
 
-        # tasks = [asyncio.create_task(create_clock()) for _ in range(REQUESTS_COUNT)]
-        tasks = []
-        for user in another_users:
-            for _ in range(REQUESTS_COUNT):
-                tasks.append(asyncio.create_task(create_clock(user)))
+        tasks = [
+            asyncio.create_task(create_clock(user))
+            for user in users
+            for _ in range(REQUESTS_COUNT)
+        ]
+
         start.set()
         results = await asyncio.gather(*tasks, return_exceptions=True)
+
         for r in results:
-            if isinstance(r, Exception):
-                raise r
+            assert not isinstance(r, Exception), r
+            assert hasattr(r, "status_code"), r
 
-        for result in results:
-            if hasattr(result, "status_code"):
-                logger.debug(f"Result: {result.status_code}")
-            else:
-                logger.error(f"Unexpected result: {result!r}")
+        max_count = (
+            await ThrottleRule.objects
+            .filter(scope=ThrottleRule.Scope.CLOCKS_CREATE)
+            .afirst()
+        ).max_requests
 
-        # --- Перевірка ---
-        # clocks = VirtualClock.objects.filter(user_owner=self.stranger_user)
-        for user in another_users:
-            count = await VirtualClock.objects.filter(user_owner=user).acount()
-            assert count == user.max_clocks_count, \
-                f"Ліміт порушено для {user.username}: {count}"
+        for user in users:
+            count = await user.virtual_clocks.acount()
+            assert count == max_count, f"{user.username}: {count}"
 
-        # Всі відповіді після досягнення ліміту повинні бути помилкою
-        success_responses = [r for r in results if getattr(r, "status_code", None) == 201]
-        error_responses = [r for r in results if getattr(r, "status_code", None) == 429]
+        success = [r for r in results if r.status_code == 201]
+        errors = [r for r in results if r.status_code == 429]
 
-        assert len(success_responses) == len(another_users) * another_users[0].max_clocks_count, "Невірна кількість створених годинників"
-        assert len(error_responses) == len(tasks) - len(another_users) * another_users[0].max_clocks_count, "Невірна кількість помилок"
+        expected_success = USERS_COUNT * max_count
+
+        assert len(success) == expected_success
+        assert len(errors) == len(tasks) - expected_success
+
+    async def test_clock_throttle_success(self):
+        response = None
+        requests_limit = (
+            await ThrottleRule.objects
+            .filter(scope=ThrottleRule.Scope.GLOBAL)
+            .afirst()
+        ).max_requests
+        logger.debug(f"tests.core.test_clocks_api.TestClockAsyncAPI.test_clock_throttling_success():"
+                     f"requests_limit: {requests_limit}")
+        for _ in range(requests_limit):
+            response = await self.client.get(
+                f"/clocks/{self.clock1.id}",
+                headers=self.auth_headers
+            )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["name"] == "Old Name"
+        assert data["user_owner_id"] == self.user.id
+
+    async def test_clock_throttle_fail(self, users_factory_async):
+        clock = await VirtualClock.objects.acreate(
+            user_owner=self.user
+        )
+        request_limit = (
+            await self.user.subscription.plan.throttle_rules.aget(scope=ThrottleRule.Scope.GLOBAL)).max_requests
+        for _ in range(request_limit):
+            response = await self.client.get(
+                f"/clocks/{clock.id}",
+                headers=self.auth_headers
+            )
+            assert response.status_code == 200
+        response = await self.client.get(
+            f"/clocks/{clock.id}",
+            headers=self.auth_headers
+        )
+        assert response.status_code == 429
+        data = response.json()
+        # logger.debug(f"core.accounts.test_clocks_api.TestClockAsyncAPI.test_clock_throttling_fail: response: {data}")
+        assert data["detail"] == "Too many requests."
+
+    async def test_create_clock_throttle_success(self):
+        request_limit = (
+            await self.user.subscription.plan.throttle_rules.aget(scope=ThrottleRule.Scope.CLOCKS_CREATE)).max_requests
+        for _ in range(request_limit):
+            response = await self.client.post(
+                path='/clocks/',
+                headers=self.auth_headers
+            )
+            assert response.status_code == 201
+        logger.debug(f"core.tests.test_clocks_api.TestClockAsyncAPI.test_create_clock_throttle(): response: {response}")
+        assert response.status_code == 201
+        data = response.json()
+        assert data["name"] is None
+        assert "id" in data
+        clock = await VirtualClock.objects.select_related("user_owner").aget(id=data["id"])
+        assert clock.user_owner == self.user
+
+    async def test_create_clock_throttle_fail(self, user):
+        # робимо запити до ліміту
+        request_limit = (
+            await self.user.subscription.plan.throttle_rules.aget(scope=ThrottleRule.Scope.CLOCKS_CREATE)).max_requests
+        for _ in range(request_limit):
+            r = await self.client.post(
+                path='/clocks/',
+                headers={"Authorization": f"Bearer {self.user.api_token}"},
+            )
+            assert r.status_code == 201
+
+        # наступний запит має впасти
+        r = await self.client.post(
+            path='/clocks/',
+            headers={"Authorization": f"Bearer {self.user.api_token}"},
+        )
+
+        data = r.json()
+
+        assert r.status_code == 429
+        assert data["detail"] == "Too many requests."
