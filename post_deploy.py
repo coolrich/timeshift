@@ -25,7 +25,8 @@ def run():
             User.objects.create_superuser(
                 username=os.environ.get('USERNAME', 'admin'),
                 email=os.environ.get('EMAIL', 'admin@example.com'),
-                password=os.environ.get('PASSWORD', 'adminpassword')
+                password=os.environ.get('PASSWORD', 'adminpassword'),
+                phone_number=os.environ.get('PHONE_NUMBER', '+380967895167')
             )
         print("Superuser created.")
         from accounts.models import Plan
