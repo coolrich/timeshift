@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid py-4">
+<h1 class="card-title py-4">Документація</h1>
+    <div class="row">
+        <!-- Sidebar -->
+        <div class="col-md-3 col-lg-2 mb-4">
+            <div class="list-group shadow-sm rounded">
+                <a href="{% url 'docs' %}"
+                   class="list-group-item list-group-item-action {% if request.path == '/profile/' %}active{% endif %}">
+                    <i class="bi"></i> Головна
+                </a>
+                <a href="{% url 'api-1.0.0:openapi-view' %}"
+                   class="list-group-item list-group-item-action {% if request.path == '/profile/' %}active{% endif %}">
+                    <i class="bi"></i> API
+                </a>
+            </div>
+        </div>
+
+        <!-- Main content -->
+        <div class="col-md-9 col-lg-10">
+            {% block docs_content %}{% endblock docs_content %}
+<!--            <div class="mt-4">-->
+<!--                {% include 'includes/messages.html' %}-->
+<!--            </div>-->
+        </div>
+    </div>
+</div>
+{% endblock content%}

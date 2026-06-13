@@ -7,6 +7,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import make_password
 
 from accounts.models import UserSubscription
+from core.models import VirtualClock
 from tests.factories.plan import PlanFactory
 from tests.factories.throttle import ThrottleFactory
 from tests.factories.user import UserFactory
@@ -45,6 +46,15 @@ def user(db, free_plan):
     logger.debug("Creating user")
     return UserFactory.with_plan(free_plan, password=USER_TEST_PASSWORD)
 
+@pytest.fixture
+def auth_client(client, user):
+    logger.debug(f"tests.accounts.test_accounts_views.auth_client():"
+                 f"username={user.username} password={USER_TEST_PASSWORD}")
+    logged_in = client.login(username=user.username, password=USER_TEST_PASSWORD)
+    logger.debug(f"tests.accounts.test_accounts_views.auth_client():"
+                 f"logged_in:{logged_in}")
+    assert logged_in, "Login failed!"
+    return client
 
 @pytest.fixture
 async def users_async(db, free_plan):
@@ -184,3 +194,7 @@ def users_factory_bulk_async(transactional_db, free_plan):
         return await sync_to_async(_create)()
 
     return create
+
+@pytest.fixture
+def owned_clock(user):
+    return VirtualClock.objects.create(user_owner=user)

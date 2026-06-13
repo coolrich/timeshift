@@ -58,13 +58,14 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.sites',
     'webapp.apps.PagesConfig',
     # 'accounts',
     'accounts.apps.AccountsConfig',
     'core',
     'phonenumber_field',
     'ninja',
-    'corsheaders'
+    'corsheaders',
 ]
 
 MIDDLEWARE = [

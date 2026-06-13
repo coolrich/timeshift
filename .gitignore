@@ -5,3 +5,4 @@ db.sqlite3
 /IMPROVEMENT_PLAN.md
 /backlog
 /CRITICAL_ISSUES_REPORT.pdf
+/tests/accounts/test_randomization_report

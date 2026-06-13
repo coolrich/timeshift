@@ -62,7 +62,7 @@ class TestUsers:
         )
         logger.debug(f"{get_current_method_path(self,self.test_create_user_success)}: response: {pprint.pformat(response.text)}")
         assert response.status_code == 200
-        assert f"Hi, {username}" in response.text
+        assert f"Привіт, {username}" in response.text
         user = User.objects.filter(username=username)
         assert user.exists()
         assert self.client.session.get('_auth_user_id') == str(user.first().id)

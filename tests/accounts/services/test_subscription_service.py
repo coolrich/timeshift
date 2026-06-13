@@ -1,24 +1,19 @@
-import pytest
-from django.contrib.auth import get_user_model
-from django.db.models import Model
-
-from accounts.models import Plan
-from accounts.services.throttle_helper import build_user_rates
-from core.auth import SessionOrToken
-from core.models import VirtualClock
-from core.services import VirtualClockController
-from  accounts.services.subscription import SubscriptionService
-from django.core.cache import cache
-
 from logging import getLogger
 
-from tests.conftest import USER_TEST_PASSWORD
+import pytest
+from django.contrib.auth import get_user_model
+from django.core.cache import cache
+
+from accounts.services.subscription import SubscriptionService
+from accounts.services.throttle_helper import build_user_rates
+from core.models import VirtualClock
+from core.services import VirtualClockController
 
 logger = getLogger(__name__)
 
 User = get_user_model()
 
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 class TestSubscriptionService:
 
     @pytest.fixture(autouse=True)

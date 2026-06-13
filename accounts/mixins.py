@@ -2,7 +2,9 @@ from django.http import HttpResponse
 
 from accounts.exceptions import LimitExceeded
 from accounts.services.rate_limit import RateLimitService
+from logging import getLogger
 
+logger = getLogger(__name__)
 
 class PostRateLimitMixin:
     throttle_methods = {"POST"}
@@ -21,6 +23,8 @@ class PostRateLimitMixin:
         return response
 
     def dispatch(self, request, *args, **kwargs):
+        logger.debug("accounts.mixins.PostRateLimitMixin.dispatch():"
+                     "")
         if self.should_limit_request(request):
             try:
                 RateLimitService.enforce_request(request, self.get_throttle_scope())

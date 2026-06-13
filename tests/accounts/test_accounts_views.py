@@ -1,38 +1,29 @@
 import datetime
+from logging import getLogger
+
 import pytest
 import pytz
 from bs4 import BeautifulSoup
-from django.core.cache import cache
-from django.urls import reverse
 from django.contrib.messages import get_messages
+from django.core.cache import cache
+from django.http import HttpRequest, QueryDict, HttpResponse
 from django.test import override_settings
+from django.urls import reverse
+from django.views import View
 
+from accounts.mixins import PostRateLimitMixin
+from accounts.models import ThrottleRule
 from core.models import VirtualClock
-from logging import getLogger
-from tests.conftest import USER_TEST_PASSWORD
+from django_project.urls import urlpatterns
+from tests.conftest import auth_client
 
 logger = getLogger(__name__)
-
-# ========================
-# HELPERS
-# ========================
-
-@pytest.fixture
-def auth_client(client, user):
-    logger.debug(f"tests.accounts.test_accounts_views.auth_client():"
-                 f"username={user.username} password={USER_TEST_PASSWORD}")
-    logged_in = client.login(username=user.username, password=USER_TEST_PASSWORD)
-    logger.debug(f"tests.accounts.test_accounts_views.auth_client():"
-                 f"logged_in:{logged_in}")
-    assert logged_in, "Login failed!"
-    return client
-
 
 # ========================
 # SIGNUP
 # ========================
 
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 class TestSignUpView:
 
     @pytest.fixture(autouse=True)
@@ -62,9 +53,14 @@ class TestSignUpView:
         assert response.url == reverse("profile_dashboard")
 
     @override_settings(NINJA_THROTTLE_RATES={"global": "1/m", "clock_create": "5/m"})
+    @pytest.mark.django_db(transaction=True)
     def test_signup_post_throttle_for_anonymous_ip(self, client):
         cache.clear()
 
+        # logger.debug('tests.accounts.test_accounts_views.TestSignUpView.test_signup_post_throttle_for_anonymous_ip:'
+        #              f'client headers: {client}')
+        logger.debug('tests.accounts.test_accounts_views.TestSignUpView.test_signup_post_throttle_for_anonymous_ip'
+                     f" cache: {cache.get(f"throttle:global:ip:{client.headers}")}")
         first_response = client.post(reverse("signup"), {})
         second_response = client.post(reverse("signup"), {})
 
@@ -77,7 +73,7 @@ class TestSignUpView:
 # PROFILE
 # ========================
 
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 class TestProfileDashboard:
 
     def test_requires_login(self, client):
@@ -101,7 +97,7 @@ class TestProfileDashboard:
 # CLOCKS
 # ========================
 
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 class TestProfileClocks:
 
     def test_clocks_list(self, auth_client, user):
@@ -131,7 +127,7 @@ class TestProfileClocks:
 # CLOCK CONTROL
 # ========================
 
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 class TestClockControl:
 
     def test_set_time(self, auth_client, user):
@@ -193,7 +189,7 @@ class TestClockControl:
 # ALLOWED USERS
 # ========================
 
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 class TestAllowedUsers:
 
     @pytest.fixture(autouse=True)
@@ -230,3 +226,53 @@ class TestAllowedUsers:
 
         assert response.status_code == 200
         assert stranger not in clock.allowed_users.all()
+
+
+class _TestView(PostRateLimitMixin, View):
+    throttle_scope = ThrottleRule.Scope.GLOBAL
+    def post(self, request, *args, **kwargs):
+        logger.debug("tests.accounts.test_accounts_views.TestPostRateLimitMixin._TestView.post():"
+                     f"request:{request}")
+        return HttpResponse("Post done!")
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.urls('tests.accounts.test_urls')
+class TestPostRateLimitMixin:
+    @pytest.fixture(autouse=True)
+    def setup(self, auth_client):
+        cache.clear()
+        logger.debug(f"tests.accounts.test_accounts_views.TestPostRateLimitMixin.setup():")
+        self.client = auth_client
+        self.tv = _TestView()
+        logger.debug(f"tests.accounts.test_accounts_views.TestPostRateLimitMixin.setup():"
+                     f" urlpatterns: {urlpatterns}")
+        yield
+        cache.clear()
+
+    def test_dispatch_success(self):
+        logger.debug(f'tests.accounts.test_accounts_views.TestPostRateLimitMixin.test_dispatch_success():')
+        req = HttpRequest()
+        req.method = "POST"
+        req.POST = QueryDict("test=true")
+        r = self.tv.dispatch(req)
+        logger.debug("tests.accounts.test_accounts_views.TestPostRateLimitMixin.test_dispatch()"
+                     f" response:{r}")
+        assert r.status_code == 200
+        r = self.client.post(reverse('test_mixin'))
+        assert r.status_code == 200
+
+    def test_dispatch_failure(self, mocker):
+        # RateLimitService.check_request = mocker.MagicMock(return_value=(False, 1, 'm'))
+        with mocker.patch('accounts.services.rate_limit.RateLimitService.check_request',
+                          mocker.MagicMock(return_value=(False, 1, 'm'))):
+            logger.debug(f'tests.accounts.test_accounts_views.TestPostRateLimitMixin.test_dispatch_failure():')
+            req = HttpRequest()
+            req.method = "POST"
+            req.POST = QueryDict("test=true")
+            r = self.tv.dispatch(req)
+            logger.debug("tests.accounts.test_accounts_views.TestPostRateLimitMixin.test_dispatch()"
+                         f" response:{r}")
+            assert r.status_code == 429
+            r = self.client.post(reverse('test_mixin'))
+            assert r.status_code == 429
