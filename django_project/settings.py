@@ -61,7 +61,7 @@ INSTALLED_APPS = [
     # 'django.contrib.sites',
     'webapp.apps.PagesConfig',
     'accounts',
-    'accounts.apps.AccountsConfig',
+    # 'accounts.apps.AccountsConfig',
     'core',
     'phonenumber_field',
     'ninja',
@@ -220,9 +220,9 @@ NINJA_THROTTLE_RATES = {
     "clock_create": "5/m",
 }
 
-if DEBUG:
-    CACHES = {
-        "default": {
-            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-        }
+# if DEBUG:
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
     }
+}
