@@ -5,6 +5,7 @@ import pytest
 from asgiref.sync import sync_to_async
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import make_password
+from django.urls import reverse
 
 from accounts.models import UserSubscription
 from core.models import VirtualClock
@@ -198,3 +199,9 @@ def users_factory_bulk_async(transactional_db, free_plan):
 @pytest.fixture
 def owned_clock(user):
     return VirtualClock.objects.create(user_owner=user)
+
+@pytest.fixture
+def clock_control_url():
+    def build(clock):
+        return reverse("clock_control", args=[clock.id])
+    return build

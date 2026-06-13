@@ -13,7 +13,6 @@ from django.views import View
 
 from accounts.mixins import PostRateLimitMixin
 from accounts.models import ThrottleRule
-from core.models import VirtualClock
 from django_project.urls import urlpatterns
 from tests.conftest import auth_client
 
@@ -99,17 +98,16 @@ class TestProfileDashboard:
 
 @pytest.mark.django_db(transaction=True)
 class TestProfileClocks:
-
-    def test_clocks_list(self, auth_client, user):
-        clock = VirtualClock.objects.create(user_owner=user)
+    def test_clocks_list(self, auth_client, user, owned_clock):
+        # clock = VirtualClock.objects.create(user_owner=user)
 
         response = auth_client.get(reverse("profile_clocks"))
 
         assert response.status_code == 200
-        assert clock in response.context["clocks"]
+        assert owned_clock in response.context["clocks"]
 
-    def test_html_elements(self, auth_client, user):
-        clock = VirtualClock.objects.create(user_owner=user)
+    def test_html_elements(self, auth_client, owned_clock):
+        # clock = VirtualClock.objects.create(user_owner=user)
 
         response = auth_client.get(reverse("profile_clocks"))
 
@@ -117,7 +115,7 @@ class TestProfileClocks:
 
         button = soup.find(
             "button",
-            attrs={"onclick": f"copyApiLink('api-link-retrieve-clock-{clock.id}')"}
+            attrs={"onclick": f"copyApiLink('api-link-retrieve-clock-{owned_clock.id}')"}
         )
 
         assert button is not None
@@ -130,53 +128,54 @@ class TestProfileClocks:
 @pytest.mark.django_db(transaction=True)
 class TestClockControl:
 
-    def test_set_time(self, auth_client, user):
-        clock = VirtualClock.objects.create(user_owner=user)
+    def test_set_time(self, auth_client, owned_clock, clock_control_url):
+        # clock = VirtualClock.objects.create(user_owner=user)
 
         now = "2011-11-04 00:05:23.283"
 
         response = auth_client.post(
-            reverse("clock_control", args=[clock.id]),
+            reverse("clock_control", args=[owned_clock.id]),
+            # clock_control_url(owned_clock.id),
             {"current_time": now},
             follow=True
         )
 
         assert response.status_code == 200
 
-        tz = pytz.timezone(user.timezone)
-        clock.refresh_from_db()
+        tz = pytz.timezone(owned_clock.user_owner.timezone)
+        owned_clock.refresh_from_db()
 
         expected = datetime.datetime.strptime(
             now, "%Y-%m-%d %H:%M:%S.%f"
         )
 
-        assert clock.current_time == tz.localize(expected)
+        assert owned_clock.current_time == tz.localize(expected)
 
-    def test_toggle_tick(self, auth_client, user):
-        clock = VirtualClock.objects.create(user_owner=user)
+    def test_toggle_tick(self, auth_client, owned_clock):
+        # clock = VirtualClock.objects.create(user_owner=user)
 
-        old_state = clock.tick_enabled
+        old_state = owned_clock.tick_enabled
 
         auth_client.post(
-            reverse("clock_control", args=[clock.id]),
+            reverse("clock_control", args=[owned_clock.id]),
             {"toggle_tick": "checkbox"}
         )
 
-        clock.refresh_from_db()
+        owned_clock.refresh_from_db()
 
-        assert clock.tick_enabled != old_state
+        assert owned_clock.tick_enabled != old_state
 
-    def test_post_throttle_uses_global_scope(self, auth_client, user, free_plan):
+    def test_post_throttle_uses_global_scope(self, auth_client, owned_clock, free_plan):
         cache.clear()
         free_plan.throttle_rules.filter(scope="global").update(max_requests=1)
-        clock = VirtualClock.objects.create(user_owner=user)
+        # clock = VirtualClock.objects.create(user_owner=user)
 
         first_response = auth_client.post(
-            reverse("clock_control", args=[clock.id]),
+            reverse("clock_control", args=[owned_clock.id]),
             {"toggle_tick": "checkbox"}
         )
         second_response = auth_client.post(
-            reverse("clock_control", args=[clock.id]),
+            reverse("clock_control", args=[owned_clock.id]),
             {"toggle_tick": "checkbox"}
         )
 
@@ -199,33 +198,33 @@ class TestAllowedUsers:
         self.stranger = users_factory_sync(1, 10)[0]
         self.user = user
 
-    def test_add_user(self, auth_client):
+    def test_add_user(self, auth_client, owned_clock):
         stranger = self.stranger
-        clock = VirtualClock.objects.create(user_owner=self.user)
+        # clock = VirtualClock.objects.create(user_owner=self.user)
 
         response = auth_client.post(
-            reverse("clock_control", args=[clock.id]),
+            reverse("clock_control", args=[owned_clock.id]),
             {"add_user_id": stranger.id}
         )
 
         assert response.status_code == 200
-        assert stranger in clock.allowed_users.all()
+        assert stranger in owned_clock.allowed_users.all()
 
         messages = list(get_messages(response.wsgi_request))
         assert messages[0].message == f"Доступ надано: {stranger.username}"
 
-    def test_remove_user(self, auth_client):
+    def test_remove_user(self, auth_client, owned_clock):
         stranger = self.stranger
-        clock = VirtualClock.objects.create(user_owner=self.user)
-        clock.allowed_users.add(stranger)
-        assert stranger in clock.allowed_users.all()
+        # clock = VirtualClock.objects.create(user_owner=self.user)
+        owned_clock.allowed_users.add(stranger)
+        assert stranger in owned_clock.allowed_users.all()
         response = auth_client.post(
-            reverse("clock_control", args=[clock.id]),
+            reverse("clock_control", args=[owned_clock.id]),
             {"remove_user_id": stranger.id}
         )
 
         assert response.status_code == 200
-        assert stranger not in clock.allowed_users.all()
+        assert stranger not in owned_clock.allowed_users.all()
 
 
 class _TestView(PostRateLimitMixin, View):
