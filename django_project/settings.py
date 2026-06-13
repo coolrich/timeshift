@@ -60,7 +60,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     # 'django.contrib.sites',
     'webapp.apps.PagesConfig',
-    # 'accounts',
+    'accounts',
     'accounts.apps.AccountsConfig',
     'core',
     'phonenumber_field',

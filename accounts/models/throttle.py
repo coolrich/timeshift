@@ -62,4 +62,7 @@ class ThrottleRule(models.Model):
         return f"{self.max_requests}/{self.period}"
 
     def __str__(self) -> str:
-        return f"ThrottleRule: plan=({self.plan}), scope=({self.scope}), max_requests=({self.max_requests}), period=({self.period})"
+        return (f"ThrottleRule: plan=({self.plan}),"
+                f" scope=({self.scope}),"
+                f" max_requests=({self.max_requests}),"
+                f" period=({self.period})")
