@@ -53,7 +53,8 @@ class TimeShiftUser(AbstractUser):
     def save(self, *args, **kwargs):
         if not self._api_token:
             self._api_token = generate_api_token(TimeShiftUser)
-        self.full_clean()
+        if not kwargs.get('update_fields'):
+            self.full_clean()
         super().save(*args, **kwargs)
 
     def refresh_token(self, *, now=None, save=True):
