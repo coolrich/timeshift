@@ -5,6 +5,7 @@ import pytest
 from asgiref.sync import sync_to_async
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import make_password
+from django.http import HttpRequest, QueryDict
 from django.urls import reverse
 
 from accounts.models import UserSubscription
@@ -12,6 +13,7 @@ from core.models import VirtualClock
 from tests.factories.plan import PlanFactory
 from tests.factories.throttle import ThrottleFactory
 from tests.factories.user import UserFactory
+from django.core.cache import cache
 
 logger = getLogger(__name__)
 
@@ -200,8 +202,32 @@ def users_factory_bulk_async(transactional_db, free_plan):
 def owned_clock(user):
     return VirtualClock.objects.create(user_owner=user)
 
+
 @pytest.fixture
 def clock_control_url():
     def build(clock):
         return reverse("clock_control", args=[clock.id])
     return build
+
+@pytest.fixture
+def signup_data():
+    return {
+        "username": "newuser",
+        "password1": "StrongPass123!",
+        "password2": "StrongPass123!",
+        "email": "newuser@example.com",
+        "phone_number": "+380687807356",
+    }
+
+@pytest.fixture
+def post_request():
+    request = HttpRequest()
+    request.method = "POST"
+    request.POST = QueryDict("test=true")
+    return request
+
+@pytest.fixture
+def clean_cache():
+    cache.clear()
+    yield
+    cache.clear()
