@@ -1,4 +1,5 @@
 import datetime
+import time
 from logging import getLogger
 
 import pytest
@@ -10,9 +11,11 @@ from django.http import HttpRequest, QueryDict, HttpResponse
 from django.test import override_settings
 from django.urls import reverse
 from django.views import View
+from freezegun import freeze_time
 
 from accounts.mixins import PostRateLimitMixin
 from accounts.models import ThrottleRule
+from accounts.services.rate_limit import RateLimitService
 from django_project.urls import urlpatterns
 from tests.conftest import auth_client
 
@@ -233,6 +236,7 @@ class _TestView(PostRateLimitMixin, View):
 @pytest.mark.django_db(transaction=True)
 @pytest.mark.urls('tests.accounts.test_urls')
 class TestPostRateLimitMixin:
+
     @pytest.fixture(autouse=True)
     def setup(self, auth_client, clean_cache):
         logger.debug(f"tests.accounts.test_accounts_views.TestPostRateLimitMixin.setup():")
@@ -263,3 +267,29 @@ class TestPostRateLimitMixin:
             assert r.status_code == 429
             r = self.client.post(reverse('test_mixin'))
             assert r.status_code == 429
+
+@pytest.mark.django_db(transaction=True)
+class TestUserTokenUpdateView:
+
+    @pytest.fixture(autouse=True)
+    def setup(self, auth_client_conf):
+        self.user, self.client = auth_client_conf(1, 'm')
+
+    # TODO: finish this test
+    def test_post_failed_message(self):
+        with freeze_time("2026-06-15T12:28:00Z"):
+            r = self.client.post(reverse('user_token_update'), follow=True)
+            assert r.status_code == 200
+            # self.client.post(reverse('user_token_update'), follow=True)
+        with freeze_time("2026-06-15T12:28:50Z"):
+            r = self.client.post(reverse('user_token_update'), follow=True)
+            m = list(get_messages(r.wsgi_request))
+            logger.debug("tests.accounts.test_accounts_views.TestUserTokenUpdateView.test_post():"
+                         f"messages:{m}")
+            self.user.refresh_from_db()
+            assert (f'Токен можна оновлювати раз на '
+                    f'{self.user.subscription.plan.throttle_rules.
+                    get(scope=ThrottleRule.Scope.TOKEN_REFRESH).window_seconds()}'
+                    f'. Спробуй через 10 с.') == m[-1].message
+            # logger.debug("tests.accounts.test_accounts_views.TestUserTokenUpdateView.test_post():"
+            #          f"response: {r.text}")

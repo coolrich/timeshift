@@ -1,3 +1,5 @@
+from babel.dates import format_timedelta
+from django.contrib import messages
 from django.http import HttpResponse
 
 from accounts.exceptions import LimitExceeded
@@ -16,7 +18,8 @@ class PostRateLimitMixin:
     def should_limit_request(self, request) -> bool:
         return request.method.upper() in self.throttle_methods and bool(self.get_throttle_scope())
 
-    def handle_limit_exceeded(self, exc: LimitExceeded):
+    @staticmethod
+    def handle_limit_exceeded(exc: LimitExceeded):
         response = HttpResponse(str(exc), status=429)
         if exc.retry_after is not None:
             response["Retry-After"] = str(exc.retry_after)
@@ -29,5 +32,14 @@ class PostRateLimitMixin:
             try:
                 RateLimitService.enforce_request(request, self.get_throttle_scope())
             except LimitExceeded as exc:
-                return self.handle_limit_exceeded(exc)
+                logger.debug("accounts.mixins.PostRateLimitMixin.dispatch():"
+                             "limit exceeded")
+                # return self.handle_limit_exceeded(exc)
+                r = self.handle_limit_exceeded(exc)
+                t = format_timedelta(int(r['Retry-After']), locale='uk', format='short')
+                messages.error(
+                    request,
+                    f"Токен можна оновлювати раз на {exc.total_seconds}. Спробуй через {exc.retry_after} с."
+                )
+
         return super().dispatch(request, *args, **kwargs)

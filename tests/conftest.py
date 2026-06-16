@@ -5,6 +5,7 @@ import pytest
 from asgiref.sync import sync_to_async
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import make_password
+from django.db.models.fields.tuple_lookups import Tuple
 from django.http import HttpRequest, QueryDict
 from django.urls import reverse
 
@@ -32,6 +33,19 @@ def free_plan(db):
 
 
 @pytest.fixture
+def free_plan_conf(db):
+    def conf(max_requests, period):
+        logger.debug("Creating free plan")
+        plan = PlanFactory.free()
+        ThrottleFactory.clocks_create_scope(plan, max_requests, period)
+        ThrottleFactory.global_scope(plan, max_requests, period)
+        ThrottleFactory.token_refresh_scope(plan, max_requests, period)
+        return plan
+
+    return conf
+
+
+@pytest.fixture
 def pro_plan(db):
     logger.debug("Creating pro plan")
     plan = PlanFactory.pro()
@@ -49,6 +63,16 @@ def user(db, free_plan):
     logger.debug("Creating user")
     return UserFactory.with_plan(free_plan, password=USER_TEST_PASSWORD)
 
+
+@pytest.fixture
+def user_conf(db, free_plan_conf):
+    def conf(max_requests, period):
+        logger.debug("Creating user")
+        return UserFactory.with_plan(free_plan_conf(max_requests, period), password=USER_TEST_PASSWORD)
+
+    return conf
+
+
 @pytest.fixture
 def auth_client(client, user):
     logger.debug(f"tests.accounts.test_accounts_views.auth_client():"
@@ -58,6 +82,26 @@ def auth_client(client, user):
                  f"logged_in:{logged_in}")
     assert logged_in, "Login failed!"
     return client
+
+
+@pytest.fixture
+def auth_client_conf(client, user_conf):
+    def conf(max_requests, period:str):
+        """
+        Returns:
+            Tuple[User, Client]
+        """
+        user = user_conf(max_requests, period)
+        logger.debug(f"tests.accounts.test_accounts_views.auth_client():"
+                     f"username={user.username} password={USER_TEST_PASSWORD}")
+        logged_in = client.login(username=user.username, password=USER_TEST_PASSWORD)
+        logger.debug(f"tests.accounts.test_accounts_views.auth_client():"
+                     f"logged_in:{logged_in}")
+        assert logged_in, "Login failed!"
+        return user, client
+
+    return conf
+
 
 @pytest.fixture
 async def users_async(db, free_plan):
@@ -198,6 +242,7 @@ def users_factory_bulk_async(transactional_db, free_plan):
 
     return create
 
+
 @pytest.fixture
 def owned_clock(user):
     return VirtualClock.objects.create(user_owner=user)
@@ -207,7 +252,9 @@ def owned_clock(user):
 def clock_control_url():
     def build(clock):
         return reverse("clock_control", args=[clock.id])
+
     return build
+
 
 @pytest.fixture
 def signup_data():
@@ -219,12 +266,14 @@ def signup_data():
         "phone_number": "+380687807356",
     }
 
+
 @pytest.fixture
 def post_request():
     request = HttpRequest()
     request.method = "POST"
     request.POST = QueryDict("test=true")
     return request
+
 
 @pytest.fixture
 def clean_cache():

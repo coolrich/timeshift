@@ -5,6 +5,7 @@ from django.conf import settings
 from django.core.cache import cache
 
 from accounts.exceptions import LimitExceeded
+from accounts.models import ThrottleRule
 from accounts.services.throttle_helper import build_user_rates
 from logging import getLogger
 
@@ -135,4 +136,6 @@ class RateLimitService:
         logger.debug("accounts.services.rate_limit.RateLimitService.enforce_request():"
                      f"scope:{scope} allowed:{allowed} retry_after: {retry_after}{period if period else ''}")
         if not allowed:
-            raise LimitExceeded(retry_after=retry_after, scope=scope)
+            raise LimitExceeded(retry_after=retry_after,
+                                total_seconds=ThrottleRule.PERIOD_TO_SECONDS[period],
+                                scope=scope)

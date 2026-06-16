@@ -201,22 +201,19 @@ class ProfileSettingsView(LoginRequiredMixin, PostRateLimitMixin, UpdateView):
 
 
 class UserTokenUpdateView(LoginRequiredMixin, PostRateLimitMixin, View):
-    throttle_scope = ThrottleRule.Scope.GLOBAL
+    throttle_scope = ThrottleRule.Scope.TOKEN_REFRESH
 
     def post(self, request, *args, **kwargs):
         logger.debug(f"UserTokenUpdateView(): post(): old token\n{request.user.api_token}")
-        try:
-            user = UserController(self.request.user).update_token()
-            logger.debug(f"UserTokenUpdateView(): post(): new token generated:\n{user.api_token}")
-        except TokenRefreshTooOften as e:
-            logger.debug(f"UserTokenUpdateView.post(): token update error")
-            total_seconds = User.get_token_refresh_cooldown().total_seconds()
-            t = format_timedelta(total_seconds, locale='uk', format='short')
-            # logger.debug(f"UserTokenUpdateView.post(): help(TOKEN_REFRESH_COOLDOWN):{help(User.TOKEN_REFRESH_COOLDOWN)}")
-            messages.error(
-                request,
-                f"Токен можна оновлювати раз на {t}. Спробуй через {e.retry_after} с."
-            )
+        # try:
+        user = UserController(self.request.user).update_token()
+        logger.debug(f"UserTokenUpdateView(): post(): new token generated:\n{user.api_token}")
+        # except TokenRefreshTooOften as e:
+        # logger.debug(f"UserTokenUpdateView.post(): token update error")
+        # total_seconds = User.get_token_refresh_cooldown().total_seconds()
+
+        # logger.debug(f"UserTokenUpdateView.post(): help(TOKEN_REFRESH_COOLDOWN):{help(User.TOKEN_REFRESH_COOLDOWN)}")
+
         referer = request.META.get("HTTP_REFERER")
         if referer:
             return redirect(referer)

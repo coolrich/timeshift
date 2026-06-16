@@ -11,7 +11,6 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 import os
 import sys
-from logging import DEBUG
 from pathlib import Path
 
 import dj_database_url
@@ -21,7 +20,6 @@ load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
@@ -35,19 +33,19 @@ if not SECRET_KEY:
     print("python -c 'from django.core.management.utils import get_random_secret_key;print(get_random_secret_key())'")
     sys.exit(1)
 
-if len(SECRET_KEY)<50:
+DEBUG = os.getenv("DEBUG", "False") == "True"
+
+if len(SECRET_KEY) < 50:
     print("WARNING: SECRET_KEY is too short(should be 50+ characters)")
     if not DEBUG:
         sys.exit(1)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv("DEBUG", "False") == "True"
 
 if DEBUG:
     ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 else:
     ALLOWED_HOSTS = [os.getenv("RENDER_EXTERNAL_HOSTNAME"), "127.0.0.1"]
-
 
 # Application definition
 
@@ -100,7 +98,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'django_project.wsgi.application'
 
-
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
@@ -151,7 +148,6 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
@@ -160,7 +156,6 @@ LANGUAGE_CODE = 'uk-UA'
 USE_I18N = True
 
 USE_TZ = True
-
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
@@ -192,18 +187,18 @@ LOGGING = {
     },
 }
 
-APPEND_SLASH=True
+APPEND_SLASH = True
 
 if DEBUG:
     CORS_ALLOW_ALL_ORIGINS = True
 else:
-    CORS_ALLOWED_ORIGINS=[
+    CORS_ALLOWED_ORIGINS = [
         'https://timeshift-32oc.onrender.com',
         'https://www.timeshift-32oc.onrender.com'
     ]
 
 CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOW_HEADERS=[
+CORS_ALLOW_HEADERS = [
     'accept',
     'accept-encoding',
     'authorization',
@@ -220,9 +215,16 @@ NINJA_THROTTLE_RATES = {
     "clock_create": "5/m",
 }
 
-# if DEBUG:
-CACHES = {
-    "default": {
-        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+if DEBUG:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        }
     }
-}
+else:
+    # Change in future
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        }
+    }

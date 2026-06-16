@@ -4,6 +4,7 @@ from accounts.models import ThrottleRule
 
 THROTTLE_CREATE_CLOCKS_LIMIT = 5
 THROTTLE_GLOBAL_LIMIT = 60
+THROTTLE_TOKEN_REFRESH_LIMIT = 1
 
 
 class ThrottleFactory:
@@ -42,6 +43,18 @@ class ThrottleFactory:
         return ThrottleFactory.create(
             plan=plan,
             scope=ThrottleRule.Scope.GLOBAL,
+            max_requests=max_requests,
+            period=period
+        )
+
+    @staticmethod
+    def token_refresh_scope(plan,
+                     max_requests=THROTTLE_TOKEN_REFRESH_LIMIT,
+                     period=ThrottleRule.Period.MINUTE
+                     ):
+        return ThrottleFactory.create(
+            plan=plan,
+            scope=ThrottleRule.Scope.TOKEN_REFRESH,
             max_requests=max_requests,
             period=period
         )
