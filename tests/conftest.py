@@ -85,8 +85,14 @@ def auth_client(client, user):
 
 
 @pytest.fixture
-def auth_client_conf(client, user_conf):
-    def conf(max_requests, period:str):
+def auth_client_conf(client, user_conf, clean_cache):
+    """
+    Returns:
+        conf(max_requests:int, period:str):
+            Returns:
+                Tuple[User, Client]
+    """
+    def conf(max_requests:int, period:str):
         """
         Returns:
             Tuple[User, Client]

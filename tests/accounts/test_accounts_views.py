@@ -1,5 +1,4 @@
 import datetime
-import time
 from logging import getLogger
 
 import pytest
@@ -7,7 +6,7 @@ import pytz
 from bs4 import BeautifulSoup
 from django.contrib.messages import get_messages
 from django.core.cache import cache
-from django.http import HttpRequest, QueryDict, HttpResponse
+from django.http import HttpResponse
 from django.test import override_settings
 from django.urls import reverse
 from django.views import View
@@ -15,7 +14,6 @@ from freezegun import freeze_time
 
 from accounts.mixins import PostRateLimitMixin
 from accounts.models import ThrottleRule
-from accounts.services.rate_limit import RateLimitService
 from django_project.urls import urlpatterns
 from tests.conftest import auth_client
 
@@ -29,37 +27,44 @@ logger = getLogger(__name__)
 class TestSignUpView:
 
     @pytest.fixture(autouse=True)
-    def set_free_plan(self, free_plan):
+    def setup(self, auth_client_conf):
         logger.debug(f"tests.accounts.test_accounts_views.TestSignUpView.set_free_plan():"
                      f"set free plan")
+        self.user, self.client = auth_client_conf(1, 'm')
 
-    def test_signup_get(self, client):
-        response = client.get(reverse("signup"))
+
+    def test_signup_get(self):
+        response = self.client.get(reverse("signup"))
 
         assert response.status_code == 200
         assert "registration/signup.html" in [t.name for t in response.templates]
         assert "form" in response.context
 
-    def test_signup_post(self, client, signup_data):
-        response = client.post(reverse("signup"), signup_data)
+    def test_signup_post(self, signup_data):
+        response = self.client.post(reverse("signup"), signup_data)
 
         assert response.status_code == 302
         assert response.url == reverse("profile_dashboard")
 
     @override_settings(NINJA_THROTTLE_RATES={"global": "1/m", "clock_create": "5/m"})
     @pytest.mark.django_db(transaction=True)
-    def test_signup_post_throttle_for_anonymous_ip(self, client, clean_cache):
-
+    def test_signup_post_throttle_for_anonymous_ip(self):
+        client = self.client
         # logger.debug('tests.accounts.test_accounts_views.TestSignUpView.test_signup_post_throttle_for_anonymous_ip:'
         #              f'client headers: {client}')
         logger.debug('tests.accounts.test_accounts_views.TestSignUpView.test_signup_post_throttle_for_anonymous_ip'
                      f" cache: {cache.get(f"throttle:global:ip:{client.headers}")}")
         first_response = client.post(reverse("signup"), {})
         second_response = client.post(reverse("signup"), {})
-
+        m = list(get_messages(second_response.wsgi_request))
+        logger.debug('tests.accounts.test_accounts_views.TestSignUpView.test_signup_post_throttle_for_anonymous_ip():'
+                     f'messages from 2-nd response:{m[0].message}')
         assert first_response.status_code == 200
-        assert second_response.status_code == 429
-        assert second_response["Retry-After"]
+        assert m[0].message == (
+            f'Too many requests. Try after {self.user.subscription.plan.throttle_rules.
+            get(scope=ThrottleRule.Scope.GLOBAL).window_seconds()}s.'
+        )
+        # assert second_response["Retry-After"]
 
 
 # ========================
@@ -160,24 +165,33 @@ class TestClockControl:
 
         assert owned_clock.tick_enabled != old_state
 
-    def test_post_throttle_uses_global_scope(self, auth_client, owned_clock, free_plan, clock_control_url, clean_cache):
+    def test_post_throttle_uses_global_scope(self, user, auth_client, owned_clock, free_plan, clock_control_url, clean_cache):
         free_plan.throttle_rules.filter(scope="global").update(max_requests=1)
         # clock = VirtualClock.objects.create(user_owner=user)
-
+        mr = user.subscription.plan.throttle_rules.get(scope="global").max_requests
+        logger.debug('tests.accounts.test_accounts_views.TestClockControl.test_post_throttle_uses_global_scope():'
+                     f'throttle_rules.max_requests:{mr}')
         first_response = auth_client.post(
             # reverse("clock_control", args=[owned_clock.id]),
             clock_control_url(owned_clock),
             {"toggle_tick": "checkbox"}
         )
+        m1 = list(m.message for m in get_messages(first_response.wsgi_request))
         second_response = auth_client.post(
             # reverse("clock_control", args=[owned_clock.id]),
             clock_control_url(owned_clock),
             {"toggle_tick": "checkbox"}
         )
-
+        m2 = list(m.message for m in get_messages(second_response.wsgi_request))
+        logger.debug('tests.accounts.test_accounts_views.TestClockControl.test_post_throttle_uses_global_scope():'
+                     f'first_response:{m1}')
+        logger.debug('tests.accounts.test_accounts_views.TestClockControl.test_post_throttle_uses_global_scope():'
+                     f'second_response:{m2}')
         assert first_response.status_code == 302
-        assert second_response.status_code == 429
-        assert second_response["Retry-After"]
+        assert m2[-1] == (
+            f"Too many requests. Try after 60s."
+        )
+
 
 
 # ========================
@@ -258,15 +272,19 @@ class TestPostRateLimitMixin:
     def test_dispatch_failure(self, mocker, post_request):
         # RateLimitService.check_request = mocker.MagicMock(return_value=(False, 1, 'm'))
         with mocker.patch('accounts.services.rate_limit.RateLimitService.check_request',
-                          mocker.MagicMock(return_value=(False, 1, 'm'))):
+                          mocker.MagicMock(return_value=(False, 60, 'm'))):
             logger.debug(f'tests.accounts.test_accounts_views.TestPostRateLimitMixin.test_dispatch_failure():')
             req = post_request
-            r = self.tv.dispatch(req)
-            logger.debug("tests.accounts.test_accounts_views.TestPostRateLimitMixin.test_dispatch()"
-                         f" response:{r}")
-            assert r.status_code == 429
+            # r = self.tv.dispatch(req)
+            # logger.debug("tests.accounts.test_accounts_views.TestPostRateLimitMixin.test_dispatch()"
+            #              f" response:{r}")
+            # assert r.status_code == 429
             r = self.client.post(reverse('test_mixin'))
-            assert r.status_code == 429
+            m = list(m.message for m in get_messages(r.wsgi_request))[0]
+            logger.debug('tests.accounts.test_accounts_views.TestPostRateLimitMixin.test_dispatch_failure():'
+                         f'message: {m}')
+            assert r.status_code == 200
+            assert 'Too many requests. Try after 60s.' == m
 
 @pytest.mark.django_db(transaction=True)
 class TestUserTokenUpdateView:
@@ -275,7 +293,6 @@ class TestUserTokenUpdateView:
     def setup(self, auth_client_conf):
         self.user, self.client = auth_client_conf(1, 'm')
 
-    # TODO: finish this test
     def test_post_failed_message(self):
         with freeze_time("2026-06-15T12:28:00Z"):
             r = self.client.post(reverse('user_token_update'), follow=True)
@@ -287,9 +304,6 @@ class TestUserTokenUpdateView:
             logger.debug("tests.accounts.test_accounts_views.TestUserTokenUpdateView.test_post():"
                          f"messages:{m}")
             self.user.refresh_from_db()
-            assert (f'Токен можна оновлювати раз на '
-                    f'{self.user.subscription.plan.throttle_rules.
-                    get(scope=ThrottleRule.Scope.TOKEN_REFRESH).window_seconds()}'
-                    f'. Спробуй через 10 с.') == m[-1].message
+            assert 'Too many requests. Try after 10s.' == m[-1].message
             # logger.debug("tests.accounts.test_accounts_views.TestUserTokenUpdateView.test_post():"
             #          f"response: {r.text}")

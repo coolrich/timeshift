@@ -22,6 +22,7 @@ def token_refresh_too_often_handler(request, exc):
         {
             "detail": "Token refresh limit exceeded",
             "retry_after": exc.retry_after,
+            "total_seconds": exc.total_seconds
         },
         status=429,
         headers={

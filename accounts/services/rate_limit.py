@@ -138,4 +138,5 @@ class RateLimitService:
         if not allowed:
             raise LimitExceeded(retry_after=retry_after,
                                 total_seconds=ThrottleRule.PERIOD_TO_SECONDS[period],
-                                scope=scope)
+                                scope=scope,
+                                period='s')

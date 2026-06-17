@@ -21,8 +21,9 @@ class PostRateLimitMixin:
     @staticmethod
     def handle_limit_exceeded(exc: LimitExceeded):
         response = HttpResponse(str(exc), status=429)
-        if exc.retry_after is not None:
-            response["Retry-After"] = str(exc.retry_after)
+        response['period'] = str(exc.period)
+        # if exc.retry_after is not None:
+        #     response["Retry-After"] = str(exc.retry_after)
         return response
 
     def dispatch(self, request, *args, **kwargs):
@@ -36,10 +37,14 @@ class PostRateLimitMixin:
                              "limit exceeded")
                 # return self.handle_limit_exceeded(exc)
                 r = self.handle_limit_exceeded(exc)
-                t = format_timedelta(int(r['Retry-After']), locale='uk', format='short')
-                messages.error(
+                # t = format_timedelta(int(r['Retry-After']), locale='uk', format='short')
+                text = r.text
+                period = r['period']
+                logger.debug("accounts.mixins.PostRateLimitMixin.dispatch():"
+                             f"message: {text}")
+                messages.info(
                     request,
-                    f"Токен можна оновлювати раз на {exc.total_seconds}. Спробуй через {exc.retry_after} с."
+                    f"{text}. Try after {exc.retry_after}{period}."
                 )
 
         return super().dispatch(request, *args, **kwargs)
