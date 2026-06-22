@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 @pytest.mark.asyncio
 class TestClockAsyncAPI:
     """Клас для асинхронних тестів годинників"""
+
     @pytest.fixture(scope="class", autouse=True)
     def init_api(self, request):
         logger.debug(f"core.TestClockAsyncAPI.init_api(): start")

@@ -16,7 +16,7 @@ def create_user_router() -> Router:
     """
     router = Router()
 
-    # Приклад оновлення користувача
+
     @router.put("/update/", response={200: UserDataUpdate, 403: ErrorUserResponse})
     def update_user(request, payload: UserUpdateRequest):
         """

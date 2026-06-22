@@ -26,6 +26,7 @@ async def get_v_clock_controller(
         request, clock_id: int
 ) -> tuple[VirtualClockController, User]:
     user = request.auth
+    logger.debug(f"core.api.api.get_v_clock_controller(): user: {user}")
     clock = await user.virtual_clocks.filter(id=clock_id) \
         .prefetch_related("allowed_users") \
         .select_related("user_owner") \

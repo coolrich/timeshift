@@ -60,8 +60,11 @@ def pro_plan(db):
 
 @pytest.fixture
 def user(db, free_plan):
-    logger.debug("Creating user")
-    return UserFactory.with_plan(free_plan, password=USER_TEST_PASSWORD)
+    logger.debug("tests.conftest.user():")
+    user = UserFactory.with_plan(free_plan, password=USER_TEST_PASSWORD)
+    logger.debug(f"tests.conftest.user(): user: {user}")
+    logger.debug(f"tests.conftest.user(): user_api_token: {user.api_token}")
+    return user
 
 
 @pytest.fixture
