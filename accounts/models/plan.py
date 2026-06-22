@@ -21,4 +21,5 @@ class Plan(models.Model):
     is_active = models.BooleanField(default=True)
 
     def __str__(self) -> str:
-        return f"Plan: name={self.name}, code={self.code}, is_active={self.is_active}"
+        return self.name
+        # return f"Plan: name={self.name}, code={self.code}, is_active={self.is_active}"
