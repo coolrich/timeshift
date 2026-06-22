@@ -151,9 +151,9 @@ class TimeShiftUser(AbstractUser):
     def get_token_refresh_cooldown(cls):
         return cls._TOKEN_REFRESH_COOLDOWN
 
-    @property
-    def rate(self):
-        return f"{self.max_requests}/{self.period}"
+    # @property
+    # def rate(self):
+    #     return f"{self.max_requests}/{self.period}"
 
     def __str__(self):
         return f"{self.username}"

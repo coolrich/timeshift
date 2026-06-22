@@ -33,15 +33,15 @@ class PostRateLimitMixin:
             try:
                 RateLimitService.enforce_request(request, self.get_throttle_scope())
             except LimitExceeded as exc:
+                # The message will be sent and actions will be limited.
                 logger.debug("accounts.mixins.PostRateLimitMixin.dispatch():"
                              "limit exceeded")
-                # return self.handle_limit_exceeded(exc)
                 r = self.handle_limit_exceeded(exc)
-                # t = format_timedelta(int(r['Retry-After']), locale='uk', format='short')
                 text = r.text
                 period = r['period']
                 logger.debug("accounts.mixins.PostRateLimitMixin.dispatch():"
                              f"message: {text}")
+                # just a message without a specific return
                 messages.info(
                     request,
                     f"{text}. Try after {exc.retry_after}{period}."

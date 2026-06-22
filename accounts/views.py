@@ -431,15 +431,14 @@ class ClockControlView(LoginRequiredMixin, PostRateLimitMixin, View):
             state = "вимкнено"
             messages_to_user.append(f"Тікання годинника {state}")
 
-    @staticmethod
-    def __htmx_toggle_tick(clock: VirtualClock, context: dict[str, VirtualClock],
+    def __htmx_toggle_tick(self, clock: VirtualClock, context: dict[str, VirtualClock],
                          controller: VirtualClockController, messages_to_user: list[Any]) -> dict[str, VirtualClock]:
         logger.debug(f"ClockControlView.post(): request.POST.get('toggle_tick'): htmx_toggle_tick():")
         controller.toggle_tick()
         state = "увімкнено" if controller.tick_status else "вимкнено"
         messages_to_user.append(f"Тікання годинника {state}")
         context = {"clock": clock}
-        context.update(clocks_list_context(ClockControlView.request, ClockControlView.get_queryset()))
+        context.update(clocks_list_context(self.request, self.get_queryset()))
         return context
 
     @staticmethod

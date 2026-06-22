@@ -8,7 +8,7 @@ from .models import TimeShiftUser, Plan, ThrottleRule, UserSubscription
 class TimeShiftUserAdmin(admin.ModelAdmin):
     list_display = ('id', 'username', 'email', 'is_staff', 'is_active', 'is_superuser')
     fieldsets = UserAdmin.fieldsets + (
-        ("TimeShift", {"fields": ("timezone", 'max_clocks_count', 'clock_create_rate')}),
+        ("TimeShift", {"fields": ("timezone", 'max_clocks_count')}),
     )
     # list_filter = ('is_staff', 'is_active', 'is_superuser')
     # search_fields = ('username', 'email')

@@ -32,7 +32,7 @@ class UserController:
         #         raise TokenRefreshTooOften(
         #             retry_after=User._TOKEN_REFRESH_COOLDOWN - delta
         #         )
-        self._user.refresh_token()
+        self._user.refresh_token(save=False)
         if save:
             self._user.save()
         return self
