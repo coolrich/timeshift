@@ -2,6 +2,7 @@ import datetime
 import re
 from collections import defaultdict
 from logging import getLogger
+from typing import Any
 
 import pytz
 from babel.dates import format_timedelta
@@ -220,7 +221,6 @@ class UserTokenUpdateView(LoginRequiredMixin, PostRateLimitMixin, View):
         else:
             return redirect(reverse('home'))
 
-
 class ClockControlView(LoginRequiredMixin, PostRateLimitMixin, View):
     throttle_scope = ThrottleRule.Scope.GLOBAL
 
@@ -243,6 +243,7 @@ class ClockControlView(LoginRequiredMixin, PostRateLimitMixin, View):
             "timezone": controller.get_time_zone()
         })
 
+    # TODO: separate this method into small pieces
     def post(self, request, *args, **kwargs):
         logger.debug(f"accounts.views.ClockControlView.post()")
         logger.debug(f"accounts.views.ClockControlView.post(): POST params: {request.POST}")
@@ -265,34 +266,17 @@ class ClockControlView(LoginRequiredMixin, PostRateLimitMixin, View):
         messages_to_user = []
 
         # --- Назва ---
-        name = request.POST.get("clock_name")
-        if name and name != controller.clock_name:
-            controller.set_clock_name(name, save=False)
-            messages_to_user.append(f"Назва годинника змінена на {name}")
+        self.__change_name(controller, messages_to_user, request)
 
         # --- Тікання ---
         element = request.POST.get("toggle_tick")
         logger.debug(f"ClockControlView.post(): element: {element}")
         if not is_htmx:
-            logger.debug(f"ClockControlView.post(): if tick_enabled != controller.tick_status not htmx")
-            if element == "checkbox" and not controller.tick_status:
-                # if tick_enabled != controller.tick_status:
-                controller.toggle_tick(enabled=True, save=False)  # або окремий метод set_tick(tick_enabled)
-                state = "увімкнено"  # if tick_enabled else "вимкнено"
-                messages_to_user.append(f"Тікання годинника {state}")
-            elif not element and controller.tick_status:
-                controller.toggle_tick(enabled=False, save=False)
-                state = "вимкнено"
-                messages_to_user.append(f"Тікання годинника {state}")
+            self.__toggle_tick(controller, element, messages_to_user)
         else:
             logger.debug(f"ClockControlView.post(): toggle_tick == {request.POST.get('toggle_tick')}")
             if request.POST.get('toggle_tick') == "button":
-                logger.debug(f"ClockControlView.post(): request.POST.get('toggle_tick') htmx")
-                controller.toggle_tick()
-                state = "увімкнено" if controller.tick_status else "вимкнено"
-                messages_to_user.append(f"Тікання годинника {state}")
-                context = {"clock": clock}
-                context.update(clocks_list_context(self.request, self.get_queryset()))
+                context = self.__htmx_toggle_tick(clock, context, controller, messages_to_user)
                 return render(
                     request,
                     "includes/clock_item.html",
@@ -303,13 +287,7 @@ class ClockControlView(LoginRequiredMixin, PostRateLimitMixin, View):
         current_time = request.POST.get("current_time")
         if current_time:
             try:
-                tz = pytz.timezone(request.user.timezone)
-                dt_naive = datetime.datetime.fromisoformat(current_time)
-                dt_user = tz.localize(dt_naive)
-                controller.set_time(dt_user, save=False, tick_auto_pause=False)
-                messages_to_user.append(
-                    f"Час годинника оновлено на {dt_user}"
-                )
+                self.__update_time(controller, current_time, messages_to_user, request)
             except (ValueError, pytz.UnknownTimeZoneError) as e:
                 messages.error(
                     request,
@@ -324,6 +302,103 @@ class ClockControlView(LoginRequiredMixin, PostRateLimitMixin, View):
         # --- Встановити швидкість часу
         old_speed = controller.get_clock_speed()
         new_speed = request.POST.get("clock_speed")
+        self.__set_time_speed(controller, new_speed, old_speed, request)
+
+        # --- Додати користувачів ---
+        if self.request.user == clock.user_owner:
+            add_user_id = request.POST.get("add_user_id")
+            if add_user_id:
+                self.__add_users(add_user_id, clock, controller, messages_to_user, request)
+                return render(
+                    request,
+                    "includes/allowed_users_table.html",
+                    context,
+                )
+
+            # --- Видалити користувачів ---
+            remove_user_id = request.POST.get("remove_user_id")
+            if remove_user_id:
+                self.__remove_users(add_user_id, controller, messages_to_user, remove_user_id, request)
+                return render(
+                    request,
+                    "includes/allowed_users_table.html",
+                    context
+                )
+
+            # --- Відправка повідомлень ---
+        self.__send_messages(controller, messages_to_user, pk, request)
+
+        next_url = self.__check_for_next_url(request)
+
+        return redirect(next_url)
+
+    @staticmethod
+    def __check_for_next_url(request) -> Any:
+        next_url = request.POST.get("next")
+
+        if not next_url or not url_has_allowed_host_and_scheme(
+                next_url,
+                allowed_hosts={request.get_host()},
+        ):
+            next_url = reverse("home")
+        return next_url
+
+    @staticmethod
+    def __send_messages(controller: VirtualClockController, messages_to_user: list[Any], pk: Any | None, request):
+        for msg in messages_to_user:
+            messages.success(request, msg)
+            logger.info(f"accounts.views.ClockControlView: Clock(pk={pk}): {msg}")
+        controller.save()
+
+    def __remove_users(self, add_user_id, controller: VirtualClockController, messages_to_user: list[Any],
+                       remove_user_id, request):
+        remove_user = User.objects.filter(id=remove_user_id).first()
+        if remove_user:
+            username = remove_user.username
+            logger.debug(f"ClockControlView.post(): remove user:"
+                         f" username {username} ID {remove_user_id}")
+            controller.update_allowed_users({'remove_users': [remove_user_id]})
+            m = f"Користувача {username} з ID {remove_user_id} видалено"
+            messages_to_user.append(m)
+            messages.error(request, m)
+        else:
+            m = "Користувача з таким ID не існує"
+            messages_to_user.append(m)
+            messages.error(request, m)
+            logger.debug(
+                f"ClockControlView.post(): add_user ID: {add_user_id}: користувача з таким ID не існує")
+
+    @staticmethod
+    def __add_users(add_user_id, clock: VirtualClock, controller: VirtualClockController,
+                    messages_to_user: list[Any], request):
+        user = User.objects.filter(id=add_user_id).first()
+        if not user:
+            m = "Користувача з таким ID не існує"
+            messages_to_user.append(m)
+            messages.error(request, m)
+            logger.debug(
+                f"ClockControlView.post(): add_user ID: {add_user_id}: користувача з таким ID не існує")
+            # return HttpResponse(
+            #     f"<div class='alert alert-info alert-dismissible fade show'>Юзер {user.id} не існує</div>"
+            # )
+        elif clock.allowed_users.filter(id=user.id).exists():
+            m = "Користувач уже має доступ"
+            logger.debug(
+                f"ClockControlView.post(): add_user ID: {add_user_id}: користувач з таким ID вже має доступ")
+            messages_to_user.append(m)
+            messages.info(request, m)
+            # return HttpResponse(
+            #     f"<div class='alert alert-info alert-dismissible fade show'>Юзер {user.id} вже має доступ</div>"
+            # )
+        else:
+            m = f"Доступ надано: {user.username}"
+            logger.debug(f"ClockControlView.post(): add_user ID: {add_user_id}: "
+                         f"надано доступ користувачу {user.username}")
+            messages_to_user.append(m)
+            controller.update_allowed_users({'add_users': [add_user_id]})
+            messages.success(request, m)
+
+    def __set_time_speed(self, controller: VirtualClockController, new_speed, old_speed: float, request):
         logger.debug(f"accounts.views.ClockControlView.post(): old_speed: {old_speed} new_speed: {new_speed}")
         if new_speed and old_speed != float(new_speed):
             try:
@@ -335,81 +410,45 @@ class ClockControlView(LoginRequiredMixin, PostRateLimitMixin, View):
                 messages.error(request,
                                e.message_dict['speed'][0] if hasattr(e, "message_dict") else e.messages)
 
-        # --- Додати користувачів ---
-        if self.request.user == clock.user_owner:
-            add_user_id = request.POST.get("add_user_id")
-            if add_user_id:
-                user = User.objects.filter(id=add_user_id).first()
-                if not user:
-                    m = "Користувача з таким ID не існує"
-                    messages_to_user.append(m)
-                    messages.error(request, m)
-                    logger.debug(
-                        f"ClockControlView.post(): add_user ID: {add_user_id}: користувача з таким ID не існує")
-                    # return HttpResponse(
-                    #     f"<div class='alert alert-info alert-dismissible fade show'>Юзер {user.id} не існує</div>"
-                    # )
-                elif clock.allowed_users.filter(id=user.id).exists():
-                    m = "Користувач уже має доступ"
-                    logger.debug(
-                        f"ClockControlView.post(): add_user ID: {add_user_id}: користувач з таким ID вже має доступ")
-                    messages_to_user.append(m)
-                    messages.info(request, m)
-                    # return HttpResponse(
-                    #     f"<div class='alert alert-info alert-dismissible fade show'>Юзер {user.id} вже має доступ</div>"
-                    # )
-                else:
-                    m = f"Доступ надано: {user.username}"
-                    logger.debug(f"ClockControlView.post(): add_user ID: {add_user_id}: "
-                                 f"надано доступ користувачу {user.username}")
-                    messages_to_user.append(m)
-                    controller.update_allowed_users({'add_users': [add_user_id]})
-                    messages.success(request, m)
-                return render(
-                    request,
-                    "includes/allowed_users_table.html",
-                    context,
-                )
+    def __update_time(self, controller: VirtualClockController, current_time, messages_to_user: list[Any], request):
+        tz = pytz.timezone(request.user.timezone)
+        dt_naive = datetime.datetime.fromisoformat(current_time)
+        dt_user = tz.localize(dt_naive)
+        controller.set_time(dt_user, save=False, tick_auto_pause=False)
+        messages_to_user.append(
+            f"Час годинника оновлено на {dt_user}"
+        )
 
-            # --- Видалити користувачів ---
-            remove_user_id = request.POST.get("remove_user_id")
-            if remove_user_id:
-                remove_user = User.objects.filter(id=remove_user_id).first()
-                if remove_user:
-                    username = remove_user.username
-                    logger.debug(f"ClockControlView.post(): remove user:"
-                                 f" username {username} ID {remove_user_id}")
-                    controller.update_allowed_users({'remove_users': [remove_user_id]})
-                    m = f"Користувача {username} з ID {remove_user_id} видалено"
-                    messages_to_user.append(m)
-                    messages.error(request, m)
-                else:
-                    m = "Користувача з таким ID не існує"
-                    messages_to_user.append(m)
-                    messages.error(request, m)
-                    logger.debug(
-                        f"ClockControlView.post(): add_user ID: {add_user_id}: користувача з таким ID не існує")
-                return render(
-                    request,
-                    "includes/allowed_users_table.html",
-                    context
-                )
+    @staticmethod
+    def __toggle_tick(controller: VirtualClockController, element, messages_to_user: list[Any]):
+        logger.debug(f"ClockControlView.post(): if tick_enabled != controller.tick_status not htmx")
+        if element == "checkbox" and not controller.tick_status:
+            # if tick_enabled != controller.tick_status:
+            controller.toggle_tick(enabled=True, save=False)  # або окремий метод set_tick(tick_enabled)
+            state = "увімкнено"  # if tick_enabled else "вимкнено"
+            messages_to_user.append(f"Тікання годинника {state}")
+        elif not element and controller.tick_status:
+            controller.toggle_tick(enabled=False, save=False)
+            state = "вимкнено"
+            messages_to_user.append(f"Тікання годинника {state}")
 
-            # --- Відправка повідомлень ---
-        for msg in messages_to_user:
-            messages.success(request, msg)
-            logger.info(f"[ClockControlView] Clock(pk={pk}): {msg}")
-        controller.save()
+    @staticmethod
+    def __htmx_toggle_tick(clock: VirtualClock, context: dict[str, VirtualClock],
+                         controller: VirtualClockController, messages_to_user: list[Any]) -> dict[str, VirtualClock]:
+        logger.debug(f"ClockControlView.post(): request.POST.get('toggle_tick'): htmx_toggle_tick():")
+        controller.toggle_tick()
+        state = "увімкнено" if controller.tick_status else "вимкнено"
+        messages_to_user.append(f"Тікання годинника {state}")
+        context = {"clock": clock}
+        context.update(clocks_list_context(ClockControlView.request, ClockControlView.get_queryset()))
+        return context
 
-        next_url = request.POST.get("next")
-
-        if not next_url or not url_has_allowed_host_and_scheme(
-                next_url,
-                allowed_hosts={request.get_host()},
-        ):
-            next_url = reverse("home")
-
-        return redirect(next_url)
+    @staticmethod
+    def __change_name(controller: VirtualClockController, messages_to_user: list[Any], request):
+        name = request.POST.get("clock_name")
+        if name and name != controller.clock_name:
+            controller.set_clock_name(name, save=False)
+            messages_to_user.append(f"Назва годинника змінена на {name}")
 
 
 class UserSearchView(LoginRequiredMixin, View):
