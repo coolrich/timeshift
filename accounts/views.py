@@ -243,7 +243,6 @@ class ClockControlView(LoginRequiredMixin, PostRateLimitMixin, View):
             "timezone": controller.get_time_zone()
         })
 
-    # TODO: separate this method into small pieces
     def post(self, request, *args, **kwargs):
         logger.debug(f"accounts.views.ClockControlView.post()")
         logger.debug(f"accounts.views.ClockControlView.post(): POST params: {request.POST}")
